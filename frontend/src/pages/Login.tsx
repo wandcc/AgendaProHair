@@ -1,13 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowRight, CalendarCheck, Eye, Loader2, QrCode, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { apiPost } from "@/lib/api";
-import { beginSession } from "@/lib/session";
 import { errMsg } from "@/lib/format";
 import { homeFor, useMe } from "@/lib/useMe";
-import { queryClient } from "@/lib/queryClient";
+import { useDemoLogin, useSignedIn } from "@/lib/useDemo";
 import type { UserOut } from "@/lib/types";
 import { Brand } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -18,26 +17,16 @@ const HERO = "https://images.unsplash.com/photo-1790009419857-51fa0a2d9354?crop=
 
 export default function Login() {
   const me = useMe();
-  const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const onSuccess = (u: UserOut) => {
-    beginSession();
-    queryClient.setQueryData(["me"], u);
-    toast.success(`Bem-vindo(a), ${u.name}!`);
-    nav(homeFor(u), { replace: true });
-  };
+  const onSuccess = useSignedIn();
   const login = useMutation({
     mutationFn: () => apiPost<UserOut>("/auth/login", { email, password }),
     onSuccess,
     onError: (e) => toast.error(errMsg(e, "Não foi possível entrar")),
   });
-  const demo = useMutation({
-    mutationFn: () => apiPost<UserOut>("/auth/demo"),
-    onSuccess,
-    onError: (e) => toast.error(errMsg(e, "Demonstração indisponível no momento")),
-  });
+  const demo = useDemoLogin();
 
   if (me.data) return <Navigate to={homeFor(me.data)} replace />;
 

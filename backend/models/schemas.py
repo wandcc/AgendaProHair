@@ -74,9 +74,23 @@ class Salon(BaseModel):
 class SalonAdminRow(Salon):
     plan_name: str = ""
     plan_price: float = 0
+    owner_name: str = ""
     owner_email: str = ""
     professionals_count: int = 0
     users_count: int = 0
+
+
+class SalonAdminUpdateIn(BaseModel):
+    """Full subscriber registration edit by the Super Admin (salon data + owner access)."""
+    name: str = Field(min_length=2, max_length=80)
+    slug: str = Field(min_length=3, max_length=60, pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")
+    phone: str = ""
+    address: str = Field(default="", max_length=160)
+    plan_id: str
+    status: SalonStatus
+    owner_name: str = Field(min_length=2)
+    owner_email: str = Field(min_length=5)
+    owner_password: Optional[str] = Field(default=None, min_length=6)  # only when resetting
 
 
 class SalonCreateIn(BaseModel):

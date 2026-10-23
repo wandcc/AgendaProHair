@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from lib.db import db
 from lib.scheduling import compute_slots, today_local
 from models.schemas import (
-    AppointmentIn, Availability, PublicBookingOut, PublicProfessional, PublicSalon, PublicService,
+    AppointmentIn, Availability, Plan, PublicBookingOut, PublicProfessional, PublicSalon, PublicService,
 )
 from routers.salon import _active_pro_ids, book
 
@@ -19,6 +19,12 @@ async def _salon(slug: str) -> dict:
     if not s:
         raise HTTPException(404, "Agenda não encontrada ou indisponível")
     return s
+
+
+@router.get("/plans", response_model=list[Plan])
+async def public_plans():
+    """Active license plans for the public sales page."""
+    return [Plan(**p) async for p in db.plans.find({"active": True}, {"_id": 0}).sort("price", 1)]
 
 
 @router.get("/salons/{slug}", response_model=PublicSalon)

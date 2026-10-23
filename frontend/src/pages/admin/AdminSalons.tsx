@@ -2,10 +2,10 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Loader2, MoreHorizontal, Plus, Store, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
-import { brl, errMsg } from "@/lib/format";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api";
+import { brl, errMsg, maskPhone } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Plan, SalonAdminRow, SalonCreateIn, SalonStatus, SalonUserIn, SalonUserOut } from "@/lib/types";
+import type { Plan, SalonAdminRow, SalonAdminUpdateIn, SalonCreateIn, SalonStatus, SalonUserIn, SalonUserOut } from "@/lib/types";
 import { EmptyState, PageHeader } from "@/components/common";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ export default function AdminSalons() {
   const [createOpen, setCreateOpen] = useState(false);
   const [usersFor, setUsersFor] = useState<SalonAdminRow | null>(null);
   const [planFor, setPlanFor] = useState<SalonAdminRow | null>(null);
+  const [editFor, setEditFor] = useState<SalonAdminRow | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin"] });
   const patch = useMutation({
@@ -100,6 +101,9 @@ export default function AdminSalons() {
                           <DropdownMenuItem variant="destructive" data-testid={`btn-suspend-${s.slug}`} onClick={() => patch.mutate({ id: s.id, body: { status: "suspenso" } })}>Suspender</DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
+                        {!s.is_demo && (
+                          <DropdownMenuItem data-testid={`btn-edit-salon-${s.slug}`} onClick={() => setEditFor(s)}>Editar cadastro</DropdownMenuItem>
+                        )}
                         <DropdownMenuItem data-testid={`btn-change-plan-${s.slug}`} onClick={() => setPlanFor(s)}>Trocar plano</DropdownMenuItem>
                         <DropdownMenuItem data-testid={`btn-manage-users-${s.slug}`} onClick={() => setUsersFor(s)}>Acessos do salão</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -115,7 +119,76 @@ export default function AdminSalons() {
       <CreateSalonDialog open={createOpen} onOpenChange={setCreateOpen} plans={planList} onDone={invalidate} />
       <ChangePlanDialog salon={planFor} onClose={() => setPlanFor(null)} plans={planList} onSave={(plan_id) => planFor && patch.mutate({ id: planFor.id, body: { plan_id } }, { onSuccess: () => setPlanFor(null) })} />
       <SalonUsersDialog salon={usersFor} onClose={() => setUsersFor(null)} onChanged={invalidate} />
+      <Dialog open={!!editFor} onOpenChange={(o) => !o && setEditFor(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" data-testid="dialog-edit-salon">
+          {editFor && <EditSalonForm key={editFor.id} salon={editFor} plans={planList} onDone={() => { invalidate(); setEditFor(null); }} />}
+        </DialogContent>
+      </Dialog>
     </>
+  );
+}
+
+function EditSalonForm({ salon, plans, onDone }: { salon: SalonAdminRow; plans: Plan[]; onDone: () => void }) {
+  const [f, setF] = useState<SalonAdminUpdateIn>({
+    name: salon.name, slug: salon.slug, phone: maskPhone(salon.phone), address: salon.address, plan_id: salon.plan_id,
+    status: salon.status, owner_name: salon.owner_name, owner_email: salon.owner_email, owner_password: null,
+  });
+  const set = <K extends keyof SalonAdminUpdateIn>(k: K, v: SalonAdminUpdateIn[K]) => setF((p) => ({ ...p, [k]: v }));
+  const save = useMutation({
+    mutationFn: () => apiPut(`/admin/salons/${salon.id}`, { ...f, phone: f.phone.replace(/\D/g, ""), owner_password: f.owner_password || null }),
+    onSuccess: () => { toast.success("Cadastro do assinante atualizado"); onDone(); },
+    onError: (e) => toast.error(errMsg(e)),
+  });
+  const submit = (e: FormEvent) => { e.preventDefault(); save.mutate(); };
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <DialogHeader>
+        <DialogTitle>Editar cadastro</DialogTitle>
+        <DialogDescription>Dados do salão, assinatura e acesso do proprietário.</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2"><Label>Nome do salão</Label><Input required minLength={2} value={f.name} onChange={(e) => set("name", e.target.value)} data-testid="input-edit-salon-name" /></div>
+        <div className="space-y-1.5">
+          <Label>Link de agendamento</Label>
+          <div className="flex items-center rounded-lg border border-input pl-2 text-sm text-slate-500">
+            /agendar/
+            <input required minLength={3} className="h-8 min-w-0 flex-1 bg-transparent px-1 text-slate-900 outline-none" value={f.slug} onChange={(e) => set("slug", slugify(e.target.value))} data-testid="input-edit-salon-slug" />
+          </div>
+        </div>
+        <div className="space-y-1.5"><Label>WhatsApp do salão</Label><Input inputMode="tel" value={f.phone} onChange={(e) => set("phone", maskPhone(e.target.value))} placeholder="(11) 99999-0000" data-testid="input-edit-salon-phone" /></div>
+        <div className="space-y-1.5 sm:col-span-2"><Label>Endereço</Label><Input value={f.address} onChange={(e) => set("address", e.target.value)} data-testid="input-edit-salon-address" /></div>
+        <div className="space-y-1.5">
+          <Label>Plano</Label>
+          <Select value={f.plan_id} onValueChange={(v: string) => set("plan_id", v)}>
+            <SelectTrigger className="w-full" data-testid="select-edit-salon-plan">
+              <SelectValue>{(v) => { const p = plans.find((x) => x.id === v); return p ? `${p.name} — ${brl(p.price)}` : "Selecione"; }}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>{plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} — {brl(p.price)}/mês</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Status da assinatura</Label>
+          <Select value={f.status} onValueChange={(v: string) => set("status", v as SalonStatus)}>
+            <SelectTrigger className="w-full" data-testid="select-edit-salon-status"><SelectValue>{(v) => STATUS[v as SalonStatus]?.label ?? ""}</SelectValue></SelectTrigger>
+            <SelectContent>{(Object.keys(STATUS) as SalonStatus[]).map((k) => <SelectItem key={k} value={k}>{STATUS[k].label}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800"><KeyRound className="size-4" /> Acesso do proprietário</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5"><Label>Nome</Label><Input required minLength={2} value={f.owner_name} onChange={(e) => set("owner_name", e.target.value)} data-testid="input-edit-owner-name" /></div>
+          <div className="space-y-1.5"><Label>E-mail de login</Label><Input required type="email" value={f.owner_email} onChange={(e) => set("owner_email", e.target.value)} data-testid="input-edit-owner-email" /></div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Nova senha (opcional)</Label>
+            <Input minLength={6} value={f.owner_password ?? ""} onChange={(e) => set("owner_password", e.target.value)} placeholder="Deixe em branco para manter a atual" data-testid="input-edit-owner-password" />
+          </div>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={save.isPending} data-testid="btn-save-edit-salon">{save.isPending && <Loader2 className="size-4 animate-spin" />} Salvar alterações</Button>
+      </DialogFooter>
+    </form>
   );
 }
 

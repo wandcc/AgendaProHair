@@ -6,6 +6,7 @@ import { AppShell, type NavItem } from "@/components/AppShell";
 import { DemoBanner } from "@/components/DemoBanner";
 import { Toaster } from "@/components/ui/sonner";
 import Login from "@/pages/Login";
+import Landing from "@/pages/Landing";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminSalons from "@/pages/admin/AdminSalons";
 import AdminPlans from "@/pages/admin/AdminPlans";
@@ -38,7 +39,7 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/agendar/:slug" element={<PublicBooking />} />
         <Route path="/admin" element={<AppShell scope="admin" nav={ADMIN_NAV} />}>

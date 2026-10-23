@@ -47,9 +47,22 @@ export interface Salon {
 export interface SalonAdminRow extends Salon {
   plan_name: string;
   plan_price: number;
+  owner_name: string;
   owner_email: string;
   professionals_count: number;
   users_count: number;
+}
+
+export interface SalonAdminUpdateIn {
+  name: string;
+  slug: string;
+  phone: string;
+  address: string;
+  plan_id: string;
+  status: SalonStatus;
+  owner_name: string;
+  owner_email: string;
+  owner_password: string | null;
 }
 
 export interface SalonCreateIn {

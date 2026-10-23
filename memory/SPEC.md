@@ -4,7 +4,8 @@ SaaS multi-tenant de agendamento e gestão para salões/barbearias/estética (pt
 Stack: FastAPI + MongoDB (backend/), React 19 + Vite + Tailwind v4 + shadcn (frontend/).
 
 ## Níveis de acesso
-- **Super Admin** (`users.platform_role="superadmin"`) → `/admin` (métricas, assinantes, planos). API `/api/admin/*`.
+- **Página de vendas** `/` (Landing): recursos, fluxo do cliente, planos ativos via `GET /api/public/plans`, botões "Ver demonstração" (POST /api/auth/demo → /app) e "Entrar".
+- **Super Admin** (`users.platform_role="superadmin"`) → `/admin` (métricas, assinantes, planos). API `/api/admin/*`. "Editar cadastro" = `PUT /api/admin/salons/{id}` (nome, slug, WhatsApp, endereço, plano, status + nome/e-mail/senha opcional do proprietário; slug/e-mail únicos → 409; salão demo não editável → 409; reset de senha encerra sessões do proprietário).
 - **Salão** (`users.salon_id` + `salon_role` owner|staff) → `/app`. API `/api/salon/*`, todas as queries filtradas por `salon_id` do principal. Salão `suspenso` → 403 em login e API. Apenas `owner` altera configurações / paga comissões.
 - **Público** → `/agendar/:slug`, API `/api/public/salons/{slug}` (+ `/availability`, `/book`). Salão suspenso → 404.
 - Sessão: cookie httpOnly `aph_session` (coleção `sessions`), `GET /api/auth/me`.

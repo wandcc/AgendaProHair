@@ -1,11 +1,13 @@
 """Super Admin (platform scope) routes: metrics, subscribers, plans, salon access users."""
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from lib.auth import hash_password, require_superadmin
 from lib.db import db
 from models.schemas import (
-    AdminMetrics, Plan, PlanBreakdown, PlanIn, Salon, SalonAdminRow, SalonCreateIn,
+    AdminMetrics, Plan, PlanBreakdown, PlanIn, Salon, SalonAdminRow, SalonAdminUpdateIn, SalonCreateIn,
     SalonPatchIn, SalonUserIn, SalonUserOut,
 )
 
@@ -59,6 +61,7 @@ async def list_salons():
         owner = await db.users.find_one({"salon_id": s["id"], "salon_role": "owner"})
         rows.append(SalonAdminRow(
             **s, plan_name=plan["name"], plan_price=plan["price"],
+            owner_name=owner["name"] if owner else "",
             owner_email=owner["email"] if owner else "",
             professionals_count=await db.professionals.count_documents({"salon_id": s["id"]}),
             users_count=await db.users.count_documents({"salon_id": s["id"]}),
@@ -98,6 +101,39 @@ async def patch_salon(salon_id: str, body: SalonPatchIn):
     return Salon(**s)
 
 
+@router.put("/salons/{salon_id}", response_model=Salon)
+async def update_salon(salon_id: str, body: SalonAdminUpdateIn):
+    s = await _salon_or_404(salon_id)
+    if s.get("is_demo"):
+        raise HTTPException(409, "O salão de demonstração não pode ser editado")
+    if not await db.plans.find_one({"id": body.plan_id}):
+        raise HTTPException(422, "Plano inválido")
+    if await db.salons.find_one({"slug": body.slug, "id": {"$ne": salon_id}}):
+        raise HTTPException(409, "Este link (slug) já está em uso")
+    owner = await db.users.find_one({"salon_id": salon_id, "salon_role": "owner"})
+    email = body.owner_email.strip().lower()
+    clash = await db.users.find_one({"email": email})
+    if clash and (not owner or clash["id"] != owner["id"]):
+        raise HTTPException(409, "Já existe um usuário com este e-mail")
+    await db.salons.update_one({"id": salon_id}, {"$set": {
+        "name": body.name, "slug": body.slug, "phone": "".join(c for c in body.phone if c.isdigit()),
+        "address": body.address, "plan_id": body.plan_id, "status": body.status,
+    }})
+    owner_set = {"name": body.owner_name, "email": email}
+    if body.owner_password:
+        owner_set["password_hash"] = hash_password(body.owner_password)
+    if owner:
+        await db.users.update_one({"id": owner["id"]}, {"$set": owner_set})
+        if body.owner_password:  # password reset logs out existing sessions
+            await db.sessions.delete_many({"user_id": owner["id"]})
+    else:
+        if not body.owner_password:
+            raise HTTPException(422, "Defina uma senha para criar o acesso do proprietário")
+        await db.users.insert_one({"id": str(uuid.uuid4()), "platform_role": None, "salon_id": salon_id,
+                                   "salon_role": "owner", **owner_set})
+    return Salon(**(await db.salons.find_one({"id": salon_id}, {"_id": 0, "demo_seeded_on": 0})))
+
+
 @router.get("/salons/{salon_id}/users", response_model=list[SalonUserOut])
 async def salon_users(salon_id: str):
     await _salon_or_404(salon_id)
@@ -110,7 +146,6 @@ async def create_salon_user(salon_id: str, body: SalonUserIn):
     email = body.email.strip().lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(409, "Já existe um usuário com este e-mail")
-    import uuid
     doc = {"id": str(uuid.uuid4()), "email": email, "name": body.name,
            "password_hash": hash_password(body.password), "platform_role": None,
            "salon_id": salon_id, "salon_role": body.salon_role}
