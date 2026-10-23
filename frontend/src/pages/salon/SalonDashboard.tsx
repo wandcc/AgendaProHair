@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Bell, CalendarClock, CalendarPlus, Coins, Copy, Inbox, Wallet, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { brl, longDate } from "@/lib/format";
-import { useMe } from "@/lib/useMe";
+import { useMe, useReadOnly } from "@/lib/useMe";
 import type { Appointment } from "@/lib/types";
 import { EmptyState, PageHeader, Panel, StatCard, StatusBadge } from "@/components/common";
 import { AppointmentDetailDialog, NewAppointmentDialog, useDashboard } from "@/components/AppointmentDialogs";
@@ -11,6 +11,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function SalonDashboard() {
   const me = useMe();
+  const ro = useReadOnly();
   const dash = useDashboard();
   const d = dash.isError ? undefined : dash.data;
   const [newOpen, setNewOpen] = useState(false);
@@ -31,7 +32,7 @@ export default function SalonDashboard() {
         actions={
           <>
             <Button variant="outline" onClick={copy} data-testid="btn-dashboard-copy-link"><Copy className="size-4" /> Copiar link</Button>
-            <Button onClick={() => setNewOpen(true)} data-testid="btn-quick-new-appointment"><CalendarPlus className="size-4" /> Novo agendamento</Button>
+            {!ro && <Button onClick={() => setNewOpen(true)} data-testid="btn-quick-new-appointment"><CalendarPlus className="size-4" /> Novo agendamento</Button>}
           </>
         }
       />

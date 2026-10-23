@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { brl, errMsg, formatPhone, longDate, maskPhone, shortDate, STATUS_META, waLink } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useReadOnly } from "@/lib/useMe";
 import type { Appointment, AppointmentIn, ApptStatus, Availability, DashboardOut, Professional, Salon, Service } from "@/lib/types";
 import { StatusBadge } from "@/components/common";
 import { Button } from "@/components/ui/button";
@@ -133,6 +134,7 @@ const STATUS_ACTIONS: { status: ApptStatus; label: string; icon: typeof CheckCir
 
 export function AppointmentDetailDialog({ appt, salonName, onClose }: { appt: Appointment | null; salonName: string; onClose: () => void }) {
   const qc = useQueryClient();
+  const ro = useReadOnly();
   const [current, setCurrent] = useState<Appointment | null>(null);
   const a = current && appt && current.id === appt.id ? current : appt;
   const patch = useMutation({
@@ -166,6 +168,12 @@ export function AppointmentDetailDialog({ appt, salonName, onClose }: { appt: Ap
           <div className="flex items-center justify-between"><span className="text-slate-500">Status</span><StatusBadge status={a.status} /></div>
           {a.notes && <p className="border-t border-slate-200 pt-2 text-slate-600">“{a.notes}”</p>}
         </div>
+        {ro ? (
+          <p className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800" data-testid="appointment-readonly-note">
+            Modo demonstração: somente visualização. Na sua conta você altera o status (Confirmado, Finalizado, Cancelado, Ausente) e envia confirmação/lembrete pelo WhatsApp.
+          </p>
+        ) : (
+        <>
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Alterar status</p>
           <div className="grid grid-cols-2 gap-2">
@@ -190,6 +198,8 @@ export function AppointmentDetailDialog({ appt, salonName, onClose }: { appt: Ap
         <DialogFooter>
           <Button variant="ghost" className="text-rose-600" onClick={() => remove.mutate()} disabled={remove.isPending} data-testid="btn-delete-appointment"><Trash2 className="size-4" /> Excluir</Button>
         </DialogFooter>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

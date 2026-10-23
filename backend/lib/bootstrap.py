@@ -14,19 +14,27 @@ from lib.db import db
 from lib.scheduling import now_local, today_local, to_hhmm, to_min, weekday_sun0
 from models.schemas import Appointment, Expense, Plan, Professional, Salon, Service
 
-ADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "admin@agendaprohair.com")
-ADMIN_PASSWORD = os.environ.get("SUPERADMIN_PASSWORD", "admin123")
+LEGACY_DEFAULT_ADMIN = "admin@agendaprohair.com"
 DEMO_EMAIL = "demo@agendaprohair.com"
 DEMO_SLUG = "salao-exemplo"
 
 
 async def ensure_base_data() -> None:
-    if not await db.users.find_one({"email": ADMIN_EMAIL}):
-        await db.users.insert_one({
-            "id": "superadmin", "email": ADMIN_EMAIL, "name": "Super Admin",
-            "password_hash": hash_password(ADMIN_PASSWORD), "platform_role": "superadmin",
-            "salon_id": None, "salon_role": None,
-        })
+    # Super admin comes from env (email + pbkdf2 hash) — no plaintext password in code or config.
+    admin_email = os.environ.get("SUPERADMIN_EMAIL", "").strip().lower()
+    admin_hash = os.environ.get("SUPERADMIN_PASSWORD_HASH", "")
+    if admin_email and admin_hash:
+        if not await db.users.find_one({"email": admin_email}):
+            await db.users.insert_one({
+                "id": f"superadmin-{admin_email}", "email": admin_email, "name": "Super Admin",
+                "password_hash": admin_hash, "platform_role": "superadmin",
+                "salon_id": None, "salon_role": None,
+            })
+        # retire the old default account (weak, publicly known password)
+        old = await db.users.find_one({"email": LEGACY_DEFAULT_ADMIN})
+        if old:
+            await db.users.delete_one({"email": LEGACY_DEFAULT_ADMIN})
+            await db.sessions.delete_many({"user_id": old["id"]})
     if await db.plans.count_documents({}) == 0:
         await db.plans.insert_many([
             Plan(id="plan-basico", name="Básico", price=49, max_professionals=2,

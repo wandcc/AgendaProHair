@@ -93,11 +93,17 @@ async def require_superadmin(p: Principal = Depends(current_principal)) -> Princ
     return p
 
 
-async def require_salon(p: Principal = Depends(current_principal)) -> Principal:
+READ_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+async def require_salon(request: Request, p: Principal = Depends(current_principal)) -> Principal:
     if not p.user.get("salon_role") or not p.salon:
         raise HTTPException(403, "Acesso restrito ao painel do salão")
     if p.salon.get("status") == "suspenso":
         raise HTTPException(403, "Assinatura suspensa. Entre em contato com o suporte AgendaPROHair.")
+    # Demo salon is view-only: every write on the salon panel is refused server-side.
+    if p.salon.get("is_demo") and request.method not in READ_METHODS:
+        raise HTTPException(403, "Modo demonstração: somente visualização. Nenhuma alteração é permitida.")
     return p
 
 

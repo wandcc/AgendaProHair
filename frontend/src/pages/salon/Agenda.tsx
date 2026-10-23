@@ -4,7 +4,7 @@ import { CalendarPlus, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { apiGet } from "@/lib/api";
 import { addDays, longDate, parseDate, shortDate, startOfWeek, STATUS_META, WEEKDAYS } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useMe } from "@/lib/useMe";
+import { useMe, useReadOnly } from "@/lib/useMe";
 import type { Appointment } from "@/lib/types";
 import { EmptyState, PageHeader } from "@/components/common";
 import { AppointmentDetailDialog, NewAppointmentDialog, useDashboard, usePros, useSalon } from "@/components/AppointmentDialogs";
@@ -16,6 +16,7 @@ const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h
 
 export default function Agenda() {
   const me = useMe();
+  const ro = useReadOnly();
   const dash = useDashboard();
   const salon = useSalon();
   const pros = usePros();
@@ -39,7 +40,7 @@ export default function Agenda() {
       <PageHeader
         title="Agenda"
         subtitle={day ? (view === "dia" ? longDate(day) : `Semana de ${shortDate(range.start)} a ${shortDate(range.end)}`) : ""}
-        actions={<Button onClick={() => setNewOpen(true)} data-testid="btn-agenda-new-appointment"><CalendarPlus className="size-4" /> Novo agendamento</Button>}
+        actions={!ro && <Button onClick={() => setNewOpen(true)} data-testid="btn-agenda-new-appointment"><CalendarPlus className="size-4" /> Novo agendamento</Button>}
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

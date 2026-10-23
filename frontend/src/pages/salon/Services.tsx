@@ -4,6 +4,7 @@ import { Clock, Pencil, Plus, Scissors, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiDelete, apiPost, apiPut } from "@/lib/api";
 import { brl, errMsg } from "@/lib/format";
+import { useReadOnly } from "@/lib/useMe";
 import type { Service, ServiceIn } from "@/lib/types";
 import { EmptyState, PageHeader } from "@/components/common";
 import { useServices } from "@/components/AppointmentDialogs";
@@ -19,6 +20,7 @@ const CATEGORIES = ["Cabelo", "Barba", "Coloração", "Unhas", "Estética", "Sob
 export default function Services() {
   const qc = useQueryClient();
   const services = useServices();
+  const ro = useReadOnly();
   const [editing, setEditing] = useState<Service | "new" | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => apiDelete(`/salon/services/${id}`),
@@ -30,7 +32,7 @@ export default function Services() {
 
   return (
     <>
-      <PageHeader title="Serviços" subtitle="Nome, duração e preço exibidos na sua página de agendamento." actions={<Button onClick={() => setEditing("new")} data-testid="btn-new-service"><Plus className="size-4" /> Novo serviço</Button>} />
+      <PageHeader title="Serviços" subtitle="Nome, duração e preço exibidos na sua página de agendamento." actions={!ro && <Button onClick={() => setEditing("new")} data-testid="btn-new-service"><Plus className="size-4" /> Novo serviço</Button>} />
       {!services.isPending && list.length === 0 ? (
         <EmptyState icon={<Scissors className="size-5" />} title="Nenhum serviço cadastrado" text="Cadastre seus serviços para que clientes possam agendar." action={<Button onClick={() => setEditing("new")}>Cadastrar serviço</Button>} />
       ) : (
@@ -46,8 +48,8 @@ export default function Services() {
                       <p className="truncate font-semibold text-slate-900">{s.name} {!s.active && <span className="text-xs font-medium text-slate-400">(inativo)</span>}</p>
                       <p className="flex items-center gap-3 text-sm text-slate-500"><span className="flex items-center gap-1"><Clock className="size-3.5" />{s.duration} min</span><span className="font-medium text-slate-800">{brl(s.price)}</span></p>
                     </div>
-                    <Button variant="ghost" size="icon-sm" onClick={() => setEditing(s)} aria-label="Editar" data-testid={`btn-edit-service-${s.id}`}><Pencil className="size-4" /></Button>
-                    <Button variant="ghost" size="icon-sm" onClick={() => remove.mutate(s.id)} aria-label="Excluir" data-testid={`btn-delete-service-${s.id}`}><Trash2 className="size-4 text-rose-600" /></Button>
+                    {!ro && <Button variant="ghost" size="icon-sm" onClick={() => setEditing(s)} aria-label="Editar" data-testid={`btn-edit-service-${s.id}`}><Pencil className="size-4" /></Button>}
+                    {!ro && <Button variant="ghost" size="icon-sm" onClick={() => remove.mutate(s.id)} aria-label="Excluir" data-testid={`btn-delete-service-${s.id}`}><Trash2 className="size-4 text-rose-600" /></Button>}
                   </div>
                 ))}
               </div>

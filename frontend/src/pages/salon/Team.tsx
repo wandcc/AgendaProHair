@@ -4,6 +4,7 @@ import { MessageCircle, Pencil, Percent, Plus, Trash2, Users } from "lucide-reac
 import { toast } from "sonner";
 import { apiDelete, apiPost, apiPut } from "@/lib/api";
 import { errMsg, formatPhone, maskPhone, waLink } from "@/lib/format";
+import { useReadOnly } from "@/lib/useMe";
 import type { Professional, ProfessionalIn } from "@/lib/types";
 import { EmptyState, PageHeader } from "@/components/common";
 import { usePros } from "@/components/AppointmentDialogs";
@@ -16,6 +17,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 export default function Team() {
   const qc = useQueryClient();
   const pros = usePros();
+  const ro = useReadOnly();
   const [editing, setEditing] = useState<Professional | "new" | null>(null);
   const remove = useMutation({
     mutationFn: (id: string) => apiDelete(`/salon/professionals/${id}`),
@@ -25,7 +27,7 @@ export default function Team() {
   const list = pros.isError ? [] : pros.data ?? [];
   return (
     <>
-      <PageHeader title="Equipe" subtitle="Profissionais, especialidades e comissão padrão." actions={<Button onClick={() => setEditing("new")} data-testid="btn-new-professional"><Plus className="size-4" /> Novo profissional</Button>} />
+      <PageHeader title="Equipe" subtitle="Profissionais, especialidades e comissão padrão." actions={!ro && <Button onClick={() => setEditing("new")} data-testid="btn-new-professional"><Plus className="size-4" /> Novo profissional</Button>} />
       {!pros.isPending && list.length === 0 ? (
         <EmptyState icon={<Users className="size-5" />} title="Nenhum profissional" text="Cadastre sua equipe para distribuir os agendamentos." action={<Button onClick={() => setEditing("new")}>Cadastrar profissional</Button>} />
       ) : (
@@ -42,14 +44,18 @@ export default function Team() {
               </div>
               <div className="mt-4 flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1 text-slate-600"><Percent className="size-3.5" /> Comissão <b className="text-slate-900">{p.commission_pct}%</b></span>
-                {p.phone && (
+                {p.phone && (ro ? (
+                  <span className="text-slate-500">{formatPhone(p.phone)}</span>
+                ) : (
                   <a href={waLink(p.phone, `Olá, ${p.name.split(" ")[0]}!`)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-emerald-700" data-testid={`btn-whatsapp-pro-${p.id}`}><MessageCircle className="size-3.5" />{formatPhone(p.phone)}</a>
-                )}
+                ))}
               </div>
-              <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
-                <Button variant="outline" size="sm" onClick={() => setEditing(p)} data-testid={`btn-edit-professional-${p.id}`}><Pencil className="size-3.5" /> Editar</Button>
-                <Button variant="ghost" size="sm" className="text-rose-600" onClick={() => remove.mutate(p.id)} data-testid={`btn-delete-professional-${p.id}`}><Trash2 className="size-3.5" /> Remover</Button>
-              </div>
+              {!ro && (
+                <div className="mt-4 flex gap-2 border-t border-slate-100 pt-3">
+                  <Button variant="outline" size="sm" onClick={() => setEditing(p)} data-testid={`btn-edit-professional-${p.id}`}><Pencil className="size-3.5" /> Editar</Button>
+                  <Button variant="ghost" size="sm" className="text-rose-600" onClick={() => remove.mutate(p.id)} data-testid={`btn-delete-professional-${p.id}`}><Trash2 className="size-3.5" /> Remover</Button>
+                </div>
+              )}
             </div>
           ))}
         </div>

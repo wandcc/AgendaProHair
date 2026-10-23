@@ -26,7 +26,7 @@ export default function SalonSettings() {
 function SettingsForm({ salon }: { salon: Salon }) {
   const qc = useQueryClient();
   const me = useMe();
-  const isOwner = me.data?.salon_role === "owner";
+  const isOwner = me.data?.salon_role === "owner" && !me.data?.is_demo;
   const [f, setF] = useState<SalonSettingsIn>({ name: salon.name, phone: maskPhone(salon.phone), address: salon.address, open_time: salon.open_time, close_time: salon.close_time, work_days: salon.work_days, slot_interval: salon.slot_interval });
   const save = useMutation({
     mutationFn: () => apiPut<Salon>("/salon/me", { ...f, phone: f.phone.replace(/\D/g, "") }),
@@ -69,7 +69,7 @@ function SettingsForm({ salon }: { salon: Salon }) {
         {isOwner ? (
           <Button type="submit" disabled={save.isPending} data-testid="btn-save-settings">{save.isPending && <Loader2 className="size-4 animate-spin" />} Salvar configurações</Button>
         ) : (
-          <p className="text-sm text-slate-500">Somente o proprietário pode alterar as configurações.</p>
+          <p className="text-sm text-slate-500" data-testid="settings-readonly-note">{me.data?.is_demo ? "Modo demonstração: somente visualização." : "Somente o proprietário pode alterar as configurações."}</p>
         )}
       </div>
     </form>

@@ -13,7 +13,8 @@ Stack: FastAPI + MongoDB (backend/), React 19 + Vite + Tailwind v4 + shadcn (fro
 plans, salons(slug único, status ativo|suspenso|inadimplente, open/close_time, work_days 0=Dom, slot_interval), users, services, professionals(commission_pct), appointments(status confirmado|finalizado|cancelado|ausente, source online|interno, commission_paid), expenses.
 
 ## Seed (startup, idempotente — lib/bootstrap.py)
-- Super admin: admin@agendaprohair.com / admin123
+- Super admin: from env SUPERADMIN_EMAIL + SUPERADMIN_PASSWORD_HASH (pbkdf2 `salt$hex`), currently wand_cc@hotmail.com. Old default admin@agendaprohair.com is deleted on startup.
+- Demo salon is READ-ONLY: `require_salon` rejects every non-GET request for `is_demo` salons (403 "Modo demonstração…"); frontend hides all write controls via `useReadOnly()` (also hides WhatsApp buttons, since demo phones are fake).
 - Planos: Básico R$49 (2 prof.), Pro R$89 (10 prof.)
 - Salão demo "Salão Exemplo" slug `salao-exemplo` (is_demo, plano Pro, Seg–Sáb 09–19h) com 7 serviços, 3 profissionais, agendamentos −28..+6 dias e 4 despesas; regenerado 1x/dia (e no botão "Ver demonstração", `POST /api/auth/demo`). Excluído do MRR.
 - Nenhum outro dado simulado: salões criados pelo admin começam vazios.

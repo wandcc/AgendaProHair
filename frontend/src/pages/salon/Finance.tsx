@@ -4,6 +4,7 @@ import { ArrowDownCircle, ArrowUpCircle, ChevronLeft, ChevronRight, Coins, Piggy
 import { toast } from "sonner";
 import { apiDelete, apiGet, apiPost } from "@/lib/api";
 import { brl, errMsg, monthLabel, shiftMonth, shortDate } from "@/lib/format";
+import { useReadOnly } from "@/lib/useMe";
 import type { Expense, ExpenseIn, FinanceOut } from "@/lib/types";
 import { EmptyState, PageHeader, Panel, StatCard } from "@/components/common";
 import { useDashboard } from "@/components/AppointmentDialogs";
@@ -21,6 +22,7 @@ const EXP_CATS = ["Aluguel", "Produtos", "Energia", "Água", "Serviços", "Marke
 export default function Finance() {
   const qc = useQueryClient();
   const dash = useDashboard();
+  const ro = useReadOnly();
   const [month, setMonth] = useState("");
   const m = month || dash.data?.today.slice(0, 7) || "";
   const fin = useQuery({ queryKey: ["salon", "finance", m], queryFn: () => apiGet<FinanceOut>(`/salon/finance?month=${m}`), enabled: !!m });
@@ -51,7 +53,7 @@ export default function Finance() {
               <span className="min-w-32 text-center text-sm font-medium first-letter:uppercase" data-testid="finance-month-label">{m ? monthLabel(m) : ""}</span>
               <Button variant="ghost" size="icon-sm" onClick={() => setMonth(shiftMonth(m, 1))} disabled={!m} aria-label="Próximo mês" data-testid="btn-finance-next-month"><ChevronRight className="size-4" /></Button>
             </div>
-            <Button onClick={() => setExpOpen(true)} data-testid="btn-new-expense"><Plus className="size-4" /> Despesa</Button>
+            {!ro && <Button onClick={() => setExpOpen(true)} data-testid="btn-new-expense"><Plus className="size-4" /> Despesa</Button>}
           </>
         }
       />
@@ -102,7 +104,7 @@ export default function Finance() {
                     <TableCell>{brl(r.commission)}</TableCell>
                     <TableCell className={r.pending > 0 ? "font-semibold text-amber-700" : "text-emerald-700"}>{r.pending > 0 ? brl(r.pending) : "Pago"}</TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={r.pending <= 0 || pay.isPending} onClick={() => pay.mutate(r.professional_id)} data-testid={`btn-pay-commission-${r.professional_id}`}>Marcar pago</Button>
+                      {!ro && <Button size="sm" variant="outline" disabled={r.pending <= 0 || pay.isPending} onClick={() => pay.mutate(r.professional_id)} data-testid={`btn-pay-commission-${r.professional_id}`}>Marcar pago</Button>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -137,7 +139,7 @@ export default function Finance() {
 
         <TabsContent value="despesas" className="mt-4">
           {d && d.expenses.length === 0 ? (
-            <EmptyState icon={<Receipt className="size-5" />} title="Nenhuma despesa" text="Registre aluguel, produtos, contas e outras saídas." action={<Button onClick={() => setExpOpen(true)}>Registrar despesa</Button>} />
+            <EmptyState icon={<Receipt className="size-5" />} title="Nenhuma despesa" text="Registre aluguel, produtos, contas e outras saídas." action={!ro && <Button onClick={() => setExpOpen(true)}>Registrar despesa</Button>} />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <Table data-testid="table-expenses">
@@ -149,7 +151,7 @@ export default function Finance() {
                       <TableCell className="font-medium">{e.description}</TableCell>
                       <TableCell className="hidden sm:table-cell">{e.category}</TableCell>
                       <TableCell className="text-right font-medium text-rose-700">{brl(e.amount)}</TableCell>
-                      <TableCell className="text-right"><Button variant="ghost" size="icon-sm" onClick={() => delExp.mutate(e.id)} aria-label="Excluir" data-testid={`btn-delete-expense-${e.id}`}><Trash2 className="size-4 text-rose-600" /></Button></TableCell>
+                      <TableCell className="text-right">{!ro && <Button variant="ghost" size="icon-sm" onClick={() => delExp.mutate(e.id)} aria-label="Excluir" data-testid={`btn-delete-expense-${e.id}`}><Trash2 className="size-4 text-rose-600" /></Button>}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
