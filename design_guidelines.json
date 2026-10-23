@@ -1,0 +1,344 @@
+{
+  "theme": {
+    "palette_archetype": "Slate, Indigo & Rose Professional Aesthetics",
+    "mode": "light_with_dark_toggle",
+    "description": "Premium multi-tenant SaaS for beauty salons, barbershops and aesthetic clinics in Brazil (pt-BR, R$, WhatsApp click-to-chat). Features a desktop responsive sidebar and a dedicated mobile bottom navigation bar (menu inferior) with 3 distinct architectural zones: Super Admin Back-office, Salon/Professional Operator Panel, and Public 4-Step Client Booking Wizard."
+  },
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#F8FAFC",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "link": "#4338CA",
+          "error": "#BE123C",
+          "success": "#047857",
+          "warning": "#B45309"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "link": "#4338CA",
+          "error": "#BE123C",
+          "success": "#047857",
+          "warning": "#B45309"
+        }
+      },
+      {
+        "name": "sidebar_dark",
+        "kind": "solid",
+        "bg": "#0F172A",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "link": "#A5B4FC",
+          "error": "#FDA4AF",
+          "success": "#6EE7B7",
+          "warning": "#FDE047"
+        }
+      },
+      {
+        "name": "bottom_nav_mobile",
+        "kind": "glass",
+        "contrast_against": "#FFFFFF",
+        "guarantee": "backdrop-blur-xl bg-white/90 border-t border-slate-200/80 shadow-lg",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "link": "#4338CA",
+          "error": "#BE123C",
+          "success": "#047857"
+        }
+      },
+      {
+        "name": "inverse",
+        "kind": "solid",
+        "bg": "#1E1B4B",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#C7D2FE",
+        "roles": {
+          "link": "#E0E7FF",
+          "error": "#FFE4E6",
+          "success": "#A7F3D0"
+        }
+      },
+      {
+        "name": "hero",
+        "kind": "image",
+        "contrast_against": "#18181B",
+        "guarantee": "scrim: linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 27, 75, 0.88) 60%, rgba(136, 19, 55, 0.75) 100%)",
+        "on_bg": "#FFFFFF",
+        "on_bg_muted": "#E2E8F0",
+        "roles": {
+          "link": "#E0E7FF",
+          "error": "#FECDD3",
+          "success": "#A7F3D0"
+        }
+      },
+      {
+        "name": "booking_wizard_card",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "link": "#4338CA",
+          "error": "#BE123C",
+          "success": "#047857",
+          "whatsapp": "#059669"
+        }
+      },
+      {
+        "name": "rose_badge",
+        "kind": "solid",
+        "bg": "#FFF1F2",
+        "on_bg": "#BE123C",
+        "on_bg_muted": "#E11D48"
+      },
+      {
+        "name": "indigo_badge",
+        "kind": "solid",
+        "bg": "#EEF2FF",
+        "on_bg": "#3730A3",
+        "on_bg_muted": "#4F46E5"
+      },
+      {
+        "name": "emerald_badge",
+        "kind": "solid",
+        "bg": "#ECFDF5",
+        "on_bg": "#065F46",
+        "on_bg_muted": "#059669"
+      },
+      {
+        "name": "amber_badge",
+        "kind": "solid",
+        "bg": "#FFFBEB",
+        "on_bg": "#92400E",
+        "on_bg_muted": "#D97706"
+      }
+    ],
+    "accent": "#4F46E5",
+    "on_accent": "#FFFFFF",
+    "accent_rose": "#E11D48",
+    "on_accent_rose": "#FFFFFF",
+    "slate_neutral": "#0F172A",
+    "whatsapp_green": "#25D366"
+  },
+  "typography": {
+    "font_heading": "'Plus Jakarta Sans Variable', sans-serif",
+    "font_sans": "'DM Sans Variable', sans-serif",
+    "font_mono": "'JetBrains Mono Variable', monospace",
+    "scale_px": {
+      "display": 56,
+      "h1": 40,
+      "h2": 30,
+      "h3": 22,
+      "h4": 18,
+      "body": 16,
+      "caption": 14
+    },
+    "currency_formatting": "Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }) -> e.g. R$ 89,00",
+    "date_formatting": "Intl.DateTimeFormat('pt-BR') -> e.g. 24 de Outubro de 2026 / 14:30"
+  },
+  "entry_surfaces": {
+    "/": "split hero — brand value & SaaS plan preview on left, live interactive booking demo & quick switcher on right",
+    "/login": "branded split login — agenda & metrics showcase panel left, tenant & role credentials form right",
+    "/admin": "super-admin command center — SaaS MRR & subscription metrics top, salon tenant management table center",
+    "/app": "salon operator daily cockpit — financial summary KPIs & quick-action ribbon top, interactive daily/weekly agenda & live queue center",
+    "/agendar/:slug": "mobile-first 4-step consumer booking wizard — salon identity header, step progress bar, and card stage container"
+  },
+  "navigation_architecture": {
+    "desktop_sidebar": {
+      "width": "w-64",
+      "style": "fixed left-0 top-0 bottom-0 bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 z-40",
+      "brand_header": "AgendaPROHair mark + tenant switcher dropdown (Super Admin / Studio Belleza / Barbearia Dom Pedro)",
+      "navigation_groups": [
+        {
+          "group": "Operação",
+          "items": [
+            { "label": "Visão Geral / Dashboard", "icon": "LayoutDashboard", "path": "/app" },
+            { "label": "Agenda Interativa", "icon": "Calendar", "path": "/app/agenda" },
+            { "label": "Comandas & Atendimentos", "icon": "Clock", "path": "/app/atendimentos" }
+          ]
+        },
+        {
+          "group": "Gestão",
+          "items": [
+            { "label": "Serviços & Preços", "icon": "Scissors", "path": "/app/servicos" },
+            { "label": "Profissionais & Equipe", "icon": "Users", "path": "/app/profissionais" },
+            { "label": "Financeiro & Comissões", "icon": "DollarSign", "path": "/app/financeiro" },
+            { "label": "Link de Agendamento (QR)", "icon": "QrCode", "path": "/app/link-agendamento" }
+          ]
+        },
+        {
+          "group": "SaaS Master",
+          "items": [
+            { "label": "Painel Super Admin", "icon": "ShieldCheck", "path": "/admin" },
+            { "label": "Assinaturas & Planos", "icon": "Layers", "path": "/admin/planos" }
+          ]
+        }
+      ],
+      "footer_user": "User avatar + salon badge + status pill + role badge (Super Admin / Assinante Salão / Profissional)"
+    },
+    "mobile_bottom_nav": {
+      "style": "md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white/95 backdrop-blur-xl border-t border-slate-200 z-50 flex items-center justify-around px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]",
+      "items": [
+        { "label": "Dashboard", "icon": "LayoutDashboard", "path": "/app" },
+        { "label": "Agenda", "icon": "Calendar", "path": "/app/agenda" },
+        { "label": "Novo Agendamento", "icon": "PlusCircle", "path": "/app/novo-agendamento", "highlight": true },
+        { "label": "Financeiro", "icon": "DollarSign", "path": "/app/financeiro" },
+        { "label": "Menu / Admin", "icon": "Menu", "path": "/app/menu" }
+      ]
+    }
+  },
+  "modules_and_features": {
+    "super_admin": {
+      "title": "Painel Super Admin (Dono da Plataforma SaaS)",
+      "kpis": [
+        { "label": "MRR (Receita Recorrente)", "id": "mrr_total", "badge": "+18.4% este mês", "currency": true },
+        { "label": "Salões Cadastrados", "id": "total_salons", "badge": "Ativos & Trial" },
+        { "label": "Profissionais Ativos", "id": "total_pros", "badge": "Na plataforma" },
+        { "label": "Assinaturas Ativas / Inadimplentes", "id": "license_health", "badge": "94% adimplência" }
+      ],
+      "actions": [
+        "Criar Salão / Novo Acesso",
+        "Ativar / Suspender Assinatura",
+        "Alterar Plano (Básico R$49 / Pro R$89 / Master R$149)",
+        "Gerenciar Planos e Recursos (limite de profissionais, comissão, WhatsApp)"
+      ]
+    },
+    "salon_dashboard": {
+      "title": "Painel do Salão / Profissional",
+      "financial_summary": [
+        { "label": "Faturamento Hoje", "currency": true },
+        { "label": "Previsão do Mês", "currency": true },
+        { "label": "Atendimentos Hoje", "count": true },
+        { "label": "Comissões a Pagar", "currency": true }
+      ],
+      "interactive_agenda": {
+        "modes": ["Visão Diária (Grade por Profissional)", "Visão Semanal", "Lista de Espera"],
+        "statuses": [
+          { "status": "Confirmado", "color": "bg-indigo-50 text-indigo-700 border-indigo-200" },
+          { "status": "Em Atendimento", "color": "bg-amber-50 text-amber-700 border-amber-200" },
+          { "status": "Concluído", "color": "bg-emerald-50 text-emerald-700 border-emerald-200" },
+          { "status": "Cancelado", "color": "bg-rose-50 text-rose-700 border-rose-200" },
+          { "status": "Não Compareceu (No-show)", "color": "bg-slate-100 text-slate-700 border-slate-300" }
+        ],
+        "quick_actions": ["Novo Agendamento Modal", "Arrastar & Reagendar", "Status Toggle", "WhatsApp Direto ao Cliente"]
+      },
+      "services_management": {
+        "fields": ["Nome do Serviço", "Categoria (Cabelo, Barba, Unhas, Estética, Sobrancelhas)", "Duração (minutos)", "Preço (R$)", "Profissionais Habilitados", "Status Ativo/Inativo"]
+      },
+      "team_management": {
+        "fields": ["Nome", "Especialidade", "WhatsApp", "Comissão Padrão (%)", "Horário de Trabalho", "Status Ativo"]
+      },
+      "financial_module": {
+        "subsections": [
+          "Receita por Atendimento & Comissões Calculadas",
+          "Controle de Comissões por Profissional (com extrato e botão de marcar como pago)",
+          "Registro de Despesas do Salão (Aluguel, Produtos, Energia)",
+          "Gráfico de Fluxo de Caixa Diário / Mensal (Recharts)"
+        ]
+      },
+      "booking_link_generator": {
+        "public_url_preview": "https://agendaprohair.com.br/agendar/studio-belleza",
+        "qr_code_generator": "QR Code interativo gerado em tempo real com botão Baixar PNG e Compartilhar no WhatsApp",
+        "customization": ["Banner do Salão", "Cor de Destaque", "Mensagem de Boas-Vindas"]
+      }
+    },
+    "public_booking_wizard": {
+      "title": "Página Pública de Agendamento do Cliente (100% Mobile-First)",
+      "step_1_services": {
+        "title": "Escolha os Serviços",
+        "features": ["Filtro por categoria (Corte, Barba, Coloração, Escova, Spa)", "Duração em minutos visível", "Preço em R$", "Carrinho multi-serviços com cálculo dinâmico de tempo total"]
+      },
+      "step_2_professional": {
+        "title": "Escolha o Profissional",
+        "options": ["Qualquer profissional disponível (Mais rápido)", "Cartões individuais de profissionais com foto, especialidade e avaliação"]
+      },
+      "step_3_datetime": {
+        "title": "Data & Horário",
+        "features": ["Calendário interativo (React Day Picker pt-BR)", "Chips de horários livres calculados com base na duração total dos serviços", "Aviso de turnos: Manhã, Tarde, Noite"]
+      },
+      "step_4_client_data_and_confirm": {
+        "title": "Seus Dados & Confirmação",
+        "inputs": ["Nome Completo", "WhatsApp com máscara (DD) 9XXXX-XXXX", "Observações"],
+        "confirmation_action": "Resumo completo + Botão 'Confirmar Agendamento' + Botão 'Enviar Confirmação via WhatsApp (Click-to-Chat Direct URL)'"
+      }
+    }
+  },
+  "image_urls": {
+    "hero_salon_interior": {
+      "url": "https://images.unsplash.com/photo-1790009419857-51fa0a2d9354?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwxfHxiZWF1dHklMjBzYWxvbiUyMGx1eHVyeSUyMHNhbG9uJTIwaW50ZXJpb3IlMjBoYWlyJTIwc3R5bGlzdHxlbnwwfHx8fDE3OTI3ODMyODl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Modern salon & barbershop interior with stylish lighting, marble panels and luxury stations",
+      "placement": "Landing hero background, public booking salon cover banner"
+    },
+    "barber_service_action": {
+      "url": "https://images.unsplash.com/photo-1647140655214-e4a2d914971f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwxfHxiYXJiZXIlMjBzaG9wJTIwbW9kZXJuJTIwZ3Jvb21pbmd8ZW58MHx8fHwxNzkyNzgzMjg5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Professional hair stylist/barber precisely cutting client hair with scissors",
+      "placement": "Service showcase card, professional profile placeholder"
+    },
+    "aesthetic_spa_care": {
+      "url": "https://images.unsplash.com/photo-1785860333038-5c6dce348544?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwxfHxhZXN0aGV0aWMlMjBjbGluaWMlMjBzcGElMjB0cmVhdG1lbnR8ZW58MHx8fHwxNzkyNzgzMjg5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Professional applying aesthetic and hair treatment to client",
+      "placement": "Aesthetic category card, salon service preview"
+    },
+    "barbershop_tools": {
+      "url": "https://images.unsplash.com/photo-1621605815971-fbc98d665033?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHw0fHxiYXJiZXIlMjBzaG9wJTIwbW9kZXJuJTIwZ3Jvb21pbmd8ZW58MHx8fHwxNzkyNzgzMjg5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Premium clippers, scissors, combs and grooming products on slate surface",
+      "placement": "Feature highlight card in landing page"
+    }
+  },
+  "motion_and_interactions": {
+    "transitions": "transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease",
+    "card_hover": "hover:shadow-md hover:border-slate-300 transition-all duration-200",
+    "step_wizard_motion": "AnimatePresence with slide-in horizontal transition (x: 20 -> 0) between booking steps",
+    "agenda_drag_or_click": "Smooth modal popover on appointment slot click with quick status change and WhatsApp message generator"
+  },
+  "testing_and_accessibility": {
+    "data_testid_convention": "All buttons, inputs, links, tabs, and KPI cards must include kebab-case data-testid attributes",
+    "key_testids": [
+      "nav-sidebar-dashboard",
+      "nav-sidebar-agenda",
+      "nav-sidebar-financeiro",
+      "nav-sidebar-servicos",
+      "nav-sidebar-profissionais",
+      "nav-sidebar-superadmin",
+      "nav-mobile-bottom-agenda",
+      "btn-quick-new-appointment",
+      "input-client-name",
+      "input-client-whatsapp",
+      "btn-confirm-booking-step4",
+      "btn-whatsapp-confirm-link",
+      "btn-copy-public-booking-url",
+      "btn-download-qr-code",
+      "table-salons-superadmin",
+      "btn-toggle-salon-status",
+      "select-plan-superadmin",
+      "agenda-calendar-grid",
+      "appointment-card-item",
+      "btn-status-confirmado",
+      "btn-status-concluido",
+      "btn-status-cancelado"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build the complete AgendaPROHair multi-tenant SaaS application in Portuguese (pt-BR) with prices formatted in BRL (R$).",
+    "Implement the 3 access views seamlessly: (1) Super Admin Master Panel with SaaS metrics & subscriber management, (2) Salon/Professional SaaS Panel with Agenda, Finance, Services & Team, (3) Public Mobile-First Booking Page (/agendar/:slug).",
+    "Include a prominent Role & Salon Switcher in the top bar to easily preview and test all 3 views (Super Admin, Salon Owner, and Client Booking).",
+    "Ensure the Desktop Sidebar is fixed on lg screens, while the Mobile Bottom Menu (Menu Inferior) appears on mobile screens (<1024px) for the salon operator.",
+    "Implement the 4-step client booking wizard with real interactive state: Service selection -> Professional selection -> Date/Time slot selection -> Client details & WhatsApp Click-to-Chat confirmation link.",
+    "Include QR Code generation using an SVG/Canvas pattern or clean visual QR display with copy URL and download/share actions.",
+    "Provide rich pre-seeded mock/database data (Studio Belleza, Barbearia Dom Pedro, Clínica Estética Glow) with realistic Brazilian appointments, services (Corte Masculino R$ 45, Escova Modeladora R$ 80, Mechas R$ 280, etc.), commission calculations, and financial charts.",
+    "Use Lucide icons, Sonner for Brazilian toasts (e.g., 'Agendamento confirmado com sucesso!'), and Recharts for monthly revenue & commission breakdown.",
+    "Attach all specified data-testid attributes to allow robust end-to-end testing."
+  ]
+}
