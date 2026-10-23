@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type SyntheticEvent, type KeyboardEvent } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { LogOut, Menu, Scissors, X, type LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { endSession } from "@/lib/session";
 import { useMe, homeFor } from "@/lib/useMe";
@@ -35,6 +36,19 @@ interface ShellProps {
   banner?: ReactNode;
 }
 
+// Demo salon: page content is view-only — every click/press/keyboard activation is swallowed
+// (scrolling still works). Navigation menus live outside this area and stay usable.
+const stop = (e: SyntheticEvent) => { e.preventDefault(); e.stopPropagation(); };
+const demoBlockers = {
+  onPointerDownCapture: stop,
+  onMouseDownCapture: stop,
+  onClickCapture: (e: SyntheticEvent) => {
+    stop(e);
+    toast.info("Modo demonstração: somente visualização.", { id: "demo-readonly" });
+  },
+  onKeyDownCapture: (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") stop(e); },
+};
+
 export function AppShell({ scope, nav, banner }: ShellProps) {
   const me = useMe();
   const loc = useLocation();
@@ -49,6 +63,7 @@ export function AppShell({ scope, nav, banner }: ShellProps) {
   if (!allowed) return <Navigate to={homeFor(u)} replace />;
 
   const mobileItems = nav.filter((n) => n.mobile);
+  const demo = scope === "salon" && u.is_demo;
   const roleLabel = scope === "admin" ? "Super Admin" : u.salon_role === "owner" ? "Proprietário" : "Profissional";
 
   return (
@@ -110,7 +125,11 @@ export function AppShell({ scope, nav, banner }: ShellProps) {
 
       <main className="pb-24 lg:pb-10 lg:pl-64">
         {banner}
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+        <div
+          className={cn("mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-8", demo && "select-none [&_*]:!cursor-default")}
+          data-testid={demo ? "demo-readonly-area" : undefined}
+          {...(demo ? demoBlockers : {})}
+        >
           <Outlet />
         </div>
       </main>

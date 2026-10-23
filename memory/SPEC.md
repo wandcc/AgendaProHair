@@ -14,7 +14,7 @@ plans, salons(slug único, status ativo|suspenso|inadimplente, open/close_time, 
 
 ## Seed (startup, idempotente — lib/bootstrap.py)
 - Super admin: from env SUPERADMIN_EMAIL + SUPERADMIN_PASSWORD_HASH (pbkdf2 `salt$hex`), currently wand_cc@hotmail.com. Old default admin@agendaprohair.com is deleted on startup.
-- Demo salon is READ-ONLY: `require_salon` rejects every non-GET request for `is_demo` salons (403 "Modo demonstração…"); frontend hides all write controls via `useReadOnly()` (also hides WhatsApp buttons, since demo phones are fake).
+- Demo salon is READ-ONLY and NON-INTERACTIVE: AppShell swallows every click/press/Enter inside the page content (`demo-readonly-area`) and shows a "somente visualização" toast; only the sidebar/bottom-nav/menu sheet and the banner's "Sair da demonstração" stay clickable. Backend: `require_salon` rejects every non-GET request for `is_demo` salons (403); frontend also hides write controls via `useReadOnly()`.
 - Planos: Básico R$49 (2 prof.), Pro R$89 (10 prof.)
 - Salão demo "Salão Exemplo" slug `salao-exemplo` (is_demo, plano Pro, Seg–Sáb 09–19h) com 7 serviços, 3 profissionais, agendamentos −28..+6 dias e 4 despesas; regenerado 1x/dia (e no botão "Ver demonstração", `POST /api/auth/demo`). Excluído do MRR.
 - Nenhum outro dado simulado: salões criados pelo admin começam vazios.
