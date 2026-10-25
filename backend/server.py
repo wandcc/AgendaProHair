@@ -1,55 +1,50 @@
-import asyncio
+"""
+Bootstrap module — ensures base data and superuser exist on startup.
+"""
 import logging
-import os
-from contextlib import asynccontextmanager
-from pathlib import Path
+import uuid
+from lib.db import supabase
+from lib.auth import hash_password
 
-from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI
-from starlette.middleware.cors import CORSMiddleware
-
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
-
-from lib.db import ensure_indexes  # noqa: E402
-from lib.bootstrap import ensure_base_data  # noqa: E402
-from routers import admin, auth, public, salon  # noqa: E402
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+DEMO_EMAIL = "demo@agendaprohair.com"
+DEMO_SALON_ID = "demo-salon-id"
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    app.state.index_task = asyncio.create_task(ensure_indexes())
+async def ensure_demo() -> None:
+    pass
+
+async def ensure_base_data() -> None:
+    logger.info("A verificar e configurar o superusuario administrador...")
+    
+    admin_email = "wand_cc@hotmail.com"
+    admin_password = "Wand050391@"
+    admin_name = "Wanderson Admin"
+    
     try:
-        await ensure_base_data()
-    except Exception as exc:  # never block boot
-        logger.error("ensure_base_data failed: %s", exc)
-    yield
-    # Supabase não precisa de client.close() manual no encerramento
-
-
-app = FastAPI(lifespan=lifespan, title="AgendaPROHair API")
-api_router = APIRouter(prefix="/api")
-
-
-@api_router.get("/")
-async def root():
-    return {"message": "AgendaPROHair API rodando com Supabase!"}
-
-
-api_router.include_router(auth.router)
-api_router.include_router(admin.router)
-api_router.include_router(salon.router)
-api_router.include_router(public.router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(api_router)
+        # Gera o hash exato utilizando o passlib/bcrypt do Python
+        hashed_pwd = hash_password(admin_password)
+        
+        # Verifica se o utilizador já existe na tabela users
+        response = supabase.table("users").select("*").eq("email", admin_email).execute()
+        existing = response.data
+        
+        if existing:
+            user_id = existing[0]["id"]
+            # Atualiza a senha e o nome se já existir
+            supabase.table("users").update({"password_hash": hashed_pwd, "name": admin_name}).eq("id", user_id).execute()
+            logger.info(f"✅ Senha do superusuario '{admin_email}' atualizada com sucesso via backend!")
+        else:
+            # Se não existir, insere o novo registo gerando um UUID obrigatório para o ID
+            new_user = {
+                "id": str(uuid.uuid4()),
+                "email": admin_email,
+                "name": admin_name,
+                "password_hash": hashed_pwd
+            }
+            supabase.table("users").insert(new_user).execute()
+            logger.info(f"✅ Superusuario '{admin_email}' criado com sucesso via backend!")
+            
+    except Exception as e:
+        logger.error(f"❌ Erro crítico ao configurar superusuario no boot: {e}")
+        raise e
