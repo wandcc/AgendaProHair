@@ -7,6 +7,14 @@ from lib.auth import hash_password
 
 logger = logging.getLogger(__name__)
 
+# Constantes de demonstração exigidas pelos routers antigos
+DEMO_EMAIL = "demo@agendaprohair.com"
+DEMO_SALON_ID = "demo-salon-id"
+
+async def ensure_demo() -> None:
+    """Função de compatibilidade para routers que chamam ensure_demo."""
+    pass
+
 async def ensure_base_data() -> None:
     """
     Executado no arranque da aplicação para garantir que dados iniciais 
