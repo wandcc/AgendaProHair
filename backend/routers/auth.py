@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from lib.auth import Principal, create_session, current_principal, destroy_session, verify_password
@@ -5,28 +6,45 @@ from lib.bootstrap import DEMO_EMAIL, ensure_demo
 from lib.db import supabase
 from models.schemas import LoginIn, UserOut
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def to_user_out(p: Principal) -> UserOut:
     u, s = p.user, p.salon
     return UserOut(
-        id=u["id"], email=u["email"], name=u["name"], platform_role=u.get("platform_role"),
-        salon_id=u.get("salon_id"), salon_role=u.get("salon_role"),
-        salon_name=s["name"] if s else None, salon_slug=s["slug"] if s else None,
-        salon_status=s["status"] if s else None, is_demo=bool(s and s.get("is_demo")),
+        id=u["id"], 
+        email=u["email"], 
+        name=u["name"], 
+        platform_role=u.get("platform_role"),
+        salon_id=u.get("salon_id"), 
+        salon_role=u.get("salon_role"),
+        salon_name=s["name"] if s else None, 
+        salon_slug=s["slug"] if s else None,
+        salon_status=s["status"] if s else None, 
+        is_demo=bool(s and s.get("is_demo")),
     )
 
 
 @router.post("/login", response_model=UserOut)
 async def login(body: LoginIn, response: Response):
     email_clean = body.email.strip().lower()
+    logger.info("Tentativa de login para o e-mail: %s", email_clean)
     
     # Buscar usuário no Supabase
     res_user = supabase.table("users").select("*").eq("email", email_clean).execute()
     user = res_user.data[0] if res_user.data else None
     
-    if not user or not verify_password(body.password, user["password_hash"]):
+    if not user:
+        logger.warning("⚠️ Utilizador nao encontrado na base de dados: %s", email_clean)
+        raise HTTPException(401, "E-mail ou senha inválidos")
+        
+    password_matches = verify_password(body.password, user["password_hash"])
+    logger.info("Resultado da verificacao de senha para %s: %s", email_clean, password_matches)
+    
+    if not password_matches:
+        logger.warning("⚠️ Senha incorreta para o utilizador: %s", email_clean)
         raise HTTPException(401, "E-mail ou senha inválidos")
         
     salon = None
@@ -38,6 +56,7 @@ async def login(body: LoginIn, response: Response):
         raise HTTPException(403, "Assinatura suspensa. Entre em contato com o suporte AgendaPROHair.")
         
     await create_session(response, user["id"])
+    logger.info("✅ Login efetuado com sucesso para %s!", email_clean)
     return to_user_out(Principal(user=user, salon=salon))
 
 
