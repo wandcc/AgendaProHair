@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from lib.auth import Principal, require_salon, require_salon_owner
-from lib.db import db
+from lib.db import supabase
 from lib.scheduling import compute_slots, pick_professional, to_hhmm, to_min, today_local
 from models.schemas import (
     Appointment, AppointmentIn, AppointmentPatch, Availability, DailyPoint, DashboardOut, Expense,
@@ -37,36 +37,41 @@ async def get_salon(p: Principal = Depends(require_salon)):
 async def update_salon(body: SalonSettingsIn, p: Principal = Depends(require_salon_owner)):
     if to_min(body.open_time) >= to_min(body.close_time):
         raise HTTPException(422, "O horário de abertura deve ser antes do fechamento")
-    await db.salons.update_one({"id": p.salon_id}, {"$set": body.model_dump()})
-    s = await db.salons.find_one({"id": p.salon_id}, {"_id": 0, "demo_seeded_on": 0})
+        
+    supabase.table("salons").update(body.model_dump()).eq("id", p.salon_id).execute()
+    
+    res_salon = supabase.table("salons").select("*").eq("id", p.salon_id).execute()
+    s = res_salon.data[0] if res_salon.data else {}
+    s.pop("demo_seeded_on", None)
     return Salon(**s)
 
 
 # ---------- services ----------
 @router.get("/services", response_model=list[Service])
 async def list_services(p: Principal = Depends(require_salon)):
-    return [Service(**s) async for s in db.services.find(_scope(p), {"_id": 0}).sort("name", 1)]
+    res = supabase.table("services").select("*").eq("salon_id", p.salon_id).order("name", desc=False).execute()
+    return [Service(**s) for s in (res.data or [])]
 
 
 @router.post("/services", response_model=Service, status_code=201)
 async def create_service(body: ServiceIn, p: Principal = Depends(require_salon)):
     svc = Service(**body.model_dump(), salon_id=p.salon_id)
-    await db.services.insert_one(svc.model_dump())
+    supabase.table("services").insert(svc.model_dump()).execute()
     return svc
 
 
 @router.put("/services/{sid}", response_model=Service)
 async def update_service(sid: str, body: ServiceIn, p: Principal = Depends(require_salon)):
-    res = await db.services.update_one(_scope(p, id=sid), {"$set": body.model_dump()})
-    if not res.matched_count:
+    res = supabase.table("services").update(body.model_dump()).eq("salon_id", p.salon_id).eq("id", sid).execute()
+    if not res.data:
         raise HTTPException(404, "Serviço não encontrado")
     return Service(id=sid, salon_id=p.salon_id, **body.model_dump())
 
 
 @router.delete("/services/{sid}")
 async def delete_service(sid: str, p: Principal = Depends(require_salon)):
-    res = await db.services.delete_one(_scope(p, id=sid))
-    if not res.deleted_count:
+    res = supabase.table("services").delete().eq("salon_id", p.salon_id).eq("id", sid).execute()
+    if not res.data:
         raise HTTPException(404, "Serviço não encontrado")
     return {"ok": True}
 
@@ -74,74 +79,103 @@ async def delete_service(sid: str, p: Principal = Depends(require_salon)):
 # ---------- professionals ----------
 @router.get("/professionals", response_model=list[Professional])
 async def list_professionals(p: Principal = Depends(require_salon)):
-    return [Professional(**x) async for x in db.professionals.find(_scope(p), {"_id": 0}).sort("name", 1)]
+    res = supabase.table("professionals").select("*").eq("salon_id", p.salon_id).order("name", desc=False).execute()
+    return [Professional(**x) for x in (res.data or [])]
 
 
 @router.post("/professionals", response_model=Professional, status_code=201)
 async def create_professional(body: ProfessionalIn, p: Principal = Depends(require_salon)):
-    plan = await db.plans.find_one({"id": (p.salon or {}).get("plan_id")})
-    count = await db.professionals.count_documents(_scope(p))
+    plan_id = (p.salon or {}).get("plan_id")
+    res_plan = supabase.table("plans").select("*").eq("id", plan_id).execute()
+    plan = res_plan.data[0] if res_plan.data else None
+    
+    res_pros = supabase.table("professionals").select("id", count="exact").eq("salon_id", p.salon_id).execute()
+    count = len(res_pros.data or [])
+    
     if plan and count >= plan["max_professionals"]:
         raise HTTPException(403, f"Seu plano {plan['name']} permite até {plan['max_professionals']} profissionais.")
+        
     pro = Professional(**body.model_dump(), salon_id=p.salon_id)
-    await db.professionals.insert_one(pro.model_dump())
+    supabase.table("professionals").insert(pro.model_dump()).execute()
     return pro
 
 
 @router.put("/professionals/{pid}", response_model=Professional)
 async def update_professional(pid: str, body: ProfessionalIn, p: Principal = Depends(require_salon)):
-    res = await db.professionals.update_one(_scope(p, id=pid), {"$set": body.model_dump()})
-    if not res.matched_count:
+    res = supabase.table("professionals").update(body.model_dump()).eq("salon_id", p.salon_id).eq("id", pid).execute()
+    if not res.data:
         raise HTTPException(404, "Profissional não encontrado")
-    await db.appointments.update_many(_scope(p, professional_id=pid), {"$set": {"professional_name": body.name}})
+        
+    # Atualizar nome do profissional nos agendamentos correspondentes
+    supabase.table("appointments").update({"professional_name": body.name}).eq("salon_id", p.salon_id).eq("professional_id", pid).execute()
+    
     return Professional(id=pid, salon_id=p.salon_id, **body.model_dump())
 
 
 @router.delete("/professionals/{pid}")
 async def delete_professional(pid: str, p: Principal = Depends(require_salon)):
-    res = await db.professionals.delete_one(_scope(p, id=pid))
-    if not res.deleted_count:
+    res = supabase.table("professionals").delete().eq("salon_id", p.salon_id).eq("id", pid).execute()
+    if not res.data:
         raise HTTPException(404, "Profissional não encontrado")
     return {"ok": True}
 
 
 # ---------- appointments ----------
 async def _active_pro_ids(salon_id: str) -> list[str]:
-    return [x["id"] async for x in db.professionals.find({"salon_id": salon_id, "active": True}).sort("name", 1)]
+    res = supabase.table("professionals").select("id").eq("salon_id", salon_id).eq("active", True).order("name", desc=False).execute()
+    return [x["id"] for x in (res.data or [])]
 
 
 async def book(salon: dict, body: AppointmentIn, source: str) -> Appointment:
     """Shared booking logic for internal + public flows (salon already resolved and scoped)."""
     sid = salon["id"]
-    svc = await db.services.find_one({"salon_id": sid, "id": body.service_id, "active": True})
+    
+    res_svc = supabase.table("services").select("*").eq("salon_id", sid).eq("id", body.service_id).eq("active", True).execute()
+    svc = res_svc.data[0] if res_svc.data else None
     if not svc:
         raise HTTPException(404, "Serviço não encontrado")
+        
     pro_ids = await _active_pro_ids(sid)
     if body.professional_id and body.professional_id not in pro_ids:
         raise HTTPException(404, "Profissional não encontrado")
+        
     if body.date < today_local():
         raise HTTPException(422, "Não é possível agendar em datas passadas")
+        
     chosen = await pick_professional(salon, body.date, body.start, svc["duration"], body.professional_id, pro_ids)
     if not chosen:
         raise HTTPException(409, "Horário indisponível. Escolha outro horário.")
-    pro = await db.professionals.find_one({"salon_id": sid, "id": chosen})
+        
+    res_pro = supabase.table("professionals").select("*").eq("salon_id", sid).eq("id", chosen).execute()
+    pro = res_pro.data[0] if res_pro.data else None
+    
     digits = "".join(c for c in body.client_phone if c.isdigit())
     if len(digits) < 10 or len(digits) > 13:
         raise HTTPException(422, "WhatsApp inválido. Use DDD + número.")
+        
     appt = Appointment(
         salon_id=sid, service_id=svc["id"], service_name=svc["name"], professional_id=chosen,
         professional_name=pro["name"], client_name=body.client_name.strip(), client_phone=digits,
         date=body.date, start=body.start, end=to_hhmm(to_min(body.start) + svc["duration"]),
         price=svc["price"], commission_pct=pro["commission_pct"], notes=body.notes, source=source,
     )
-    await db.appointments.insert_one(appt.model_dump())
+    supabase.table("appointments").insert(appt.model_dump()).execute()
     return appt
 
 
 @router.get("/appointments", response_model=list[Appointment])
 async def list_appointments(start: str = Query(...), end: str = Query(...), p: Principal = Depends(require_salon)):
-    q = _scope(p, date={"$gte": start, "$lte": end})
-    return [Appointment(**a) async for a in db.appointments.find(q, {"_id": 0}).sort([("date", 1), ("start", 1)])]
+    res = (
+        supabase.table("appointments")
+        .select("*")
+        .eq("salon_id", p.salon_id)
+        .gte("date", start)
+        .lte("date", end)
+        .order("date", desc=False)
+        .order("start", desc=False)
+        .execute()
+    )
+    return [Appointment(**a) for a in (res.data or [])]
 
 
 @router.post("/appointments", response_model=Appointment, status_code=201)
@@ -151,17 +185,19 @@ async def create_appointment(body: AppointmentIn, p: Principal = Depends(require
 
 @router.patch("/appointments/{aid}", response_model=Appointment)
 async def patch_appointment(aid: str, body: AppointmentPatch, p: Principal = Depends(require_salon)):
-    res = await db.appointments.update_one(_scope(p, id=aid), {"$set": {"status": body.status}})
-    if not res.matched_count:
+    res = supabase.table("appointments").update({"status": body.status}).eq("salon_id", p.salon_id).eq("id", aid).execute()
+    if not res.data:
         raise HTTPException(404, "Agendamento não encontrado")
-    a = await db.appointments.find_one(_scope(p, id=aid), {"_id": 0})
+        
+    res_appt = supabase.table("appointments").select("*").eq("salon_id", p.salon_id).eq("id", aid).execute()
+    a = res_appt.data[0] if res_appt.data else None
     return Appointment(**a)
 
 
 @router.delete("/appointments/{aid}")
 async def delete_appointment(aid: str, p: Principal = Depends(require_salon)):
-    res = await db.appointments.delete_one(_scope(p, id=aid))
-    if not res.deleted_count:
+    res = supabase.table("appointments").delete().eq("salon_id", p.salon_id).eq("id", aid).execute()
+    if not res.data:
         raise HTTPException(404, "Agendamento não encontrado")
     return {"ok": True}
 
@@ -169,12 +205,15 @@ async def delete_appointment(aid: str, p: Principal = Depends(require_salon)):
 @router.get("/availability", response_model=Availability)
 async def availability(date: str, service_id: str, professional_id: Optional[str] = None,
                        p: Principal = Depends(require_salon)):
-    svc = await db.services.find_one(_scope(p, id=service_id))
+    res_svc = supabase.table("services").select("*").eq("salon_id", p.salon_id).eq("id", service_id).execute()
+    svc = res_svc.data[0] if res_svc.data else None
     if not svc:
         raise HTTPException(404, "Serviço não encontrado")
+        
     pro_ids = await _active_pro_ids(p.salon_id)
     if professional_id:
         pro_ids = [x for x in pro_ids if x == professional_id]
+        
     is_open, slots = await compute_slots(p.salon or {}, date, svc["duration"], pro_ids)
     return Availability(date=date, open=is_open, slots=list(slots.keys()))
 
@@ -207,10 +246,41 @@ def _count(appts: list[dict], *statuses: str) -> int:
 @router.get("/dashboard", response_model=DashboardOut)
 async def dashboard(p: Principal = Depends(require_salon)):
     today = today_local()
-    month_appts = await db.appointments.find(_scope(p, date={"$regex": f"^{today[:7]}"}), {"_id": 0}).to_list(10000)
+    month_prefix = today[:7]
+    
+    # Buscar agendamentos do mês (usando filtro de data com .like ou .gte/.lte)
+    res_month = (
+        supabase.table("appointments")
+        .select("*")
+        .eq("salon_id", p.salon_id)
+        .like("date", f"{month_prefix}%")
+        .execute()
+    )
+    month_appts = res_month.data or []
+    
     today_appts = sorted((a for a in month_appts if a["date"] == today), key=lambda a: a["start"])
-    pending_comm = await db.appointments.find(_scope(p, status="finalizado", commission_paid=False), {"_id": 0}).to_list(10000)
-    recent = await db.appointments.find(_scope(p, source="online"), {"_id": 0}).sort("created_at", -1).to_list(6)
+    
+    res_comm = (
+        supabase.table("appointments")
+        .select("*")
+        .eq("salon_id", p.salon_id)
+        .eq("status", "finalizado")
+        .eq("commission_paid", False)
+        .execute()
+    )
+    pending_comm = res_comm.data or []
+    
+    res_recent = (
+        supabase.table("appointments")
+        .select("*")
+        .eq("salon_id", p.salon_id)
+        .eq("source", "online")
+        .order("created_at", desc=True)
+        .limit(6)
+        .execute()
+    )
+    recent = res_recent.data or []
+    
     return DashboardOut(
         today=today,
         revenue_today=_price_sum(today_appts, "finalizado"),
@@ -270,14 +340,37 @@ def _daily_series(month: str, appts: list[dict], expenses: list[dict]) -> list[D
 async def finance(month: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
                   p: Principal = Depends(require_salon)):
     month = month or today_local()[:7]
-    appts = await db.appointments.find(_scope(p, date={"$regex": f"^{month}"}, status="finalizado"),
-                                       {"_id": 0}).sort([("date", -1), ("start", -1)]).to_list(10000)
-    expenses = await db.expenses.find(_scope(p, date={"$regex": f"^{month}"}), {"_id": 0}).sort("date", -1).to_list(5000)
-    pros = await db.professionals.find(_scope(p), {"_id": 0}).to_list(500)
+    
+    res_appts = (
+        supabase.table("appointments")
+        .select("*")
+        .eq("salon_id", p.salon_id)
+        .like("date", f"{month}%")
+        .eq("status", "finalizado")
+        .order("date", desc=True)
+        .order("start", desc=True)
+        .execute()
+    )
+    appts = res_appts.data or []
+    
+    res_expenses = (
+        supabase.table("expenses")
+        .select("*")
+        .eq("salon_id", p.salon_id)
+        .like("date", f"{month}%")
+        .order("date", desc=True)
+        .execute()
+    )
+    expenses = res_expenses.data or []
+    
+    res_pros = supabase.table("professionals").select("*").eq("salon_id", p.salon_id).execute()
+    pros = res_pros.data or []
+    
     by_pro = _commission_rows(pros, appts)
     revenue = sum(a["price"] for a in appts)
     exp_total = sum(e["amount"] for e in expenses)
     comm_total = round(sum(r.commission for r in by_pro), 2)
+    
     return FinanceOut(
         month=month, revenue=revenue, expenses_total=exp_total, commissions_total=comm_total,
         profit=round(revenue - exp_total - comm_total, 2), by_professional=by_pro,
@@ -288,24 +381,30 @@ async def finance(month: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d
 
 @router.post("/commissions/pay")
 async def pay_commission(body: PayCommissionIn, p: Principal = Depends(require_salon_owner)):
-    res = await db.appointments.update_many(
-        _scope(p, professional_id=body.professional_id, status="finalizado", commission_paid=False,
-               date={"$regex": f"^{body.month}"}),
-        {"$set": {"commission_paid": True}},
+    res = (
+        supabase.table("appointments")
+        .update({"commission_paid": True})
+        .eq("salon_id", p.salon_id)
+        .eq("professional_id", body.professional_id)
+        .eq("status", "finalizado")
+        .eq("commission_paid", False)
+        .like("date", f"{body.month}%")
+        .execute()
     )
-    return {"ok": True, "updated": res.modified_count}
+    updated_count = len(res.data or [])
+    return {"ok": True, "updated": updated_count}
 
 
 @router.post("/expenses", response_model=Expense, status_code=201)
 async def create_expense(body: ExpenseIn, p: Principal = Depends(require_salon)):
     e = Expense(**body.model_dump(), salon_id=p.salon_id)
-    await db.expenses.insert_one(e.model_dump())
+    supabase.table("expenses").insert(e.model_dump()).execute()
     return e
 
 
 @router.delete("/expenses/{eid}")
 async def delete_expense(eid: str, p: Principal = Depends(require_salon)):
-    res = await db.expenses.delete_one(_scope(p, id=eid))
-    if not res.deleted_count:
+    res = supabase.table("expenses").delete().eq("salon_id", p.salon_id).eq("id", eid).execute()
+    if not res.data:
         raise HTTPException(404, "Despesa não encontrada")
     return {"ok": True}
