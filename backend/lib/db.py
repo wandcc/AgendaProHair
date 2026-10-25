@@ -18,6 +18,9 @@ if not supabase_url or not supabase_key:
 # Cliente global do Supabase para toda a aplicação
 supabase: Client = create_client(supabase_url, supabase_key)
 
+# Apelido para manter compatibilidade com imports antigos (`from lib.db import db`)
+db = supabase
+
 logger = logging.getLogger(__name__)
 
 async def ensure_indexes() -> None:
