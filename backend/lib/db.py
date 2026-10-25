@@ -1,22 +1,28 @@
+"""Shared Supabase handle — import `supabase` from here (server.py, routers, seed.py)."""
+
+import logging
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
-ROOT_DIR = Path(__file__).parent.parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(Path(__file__).parent.parent / ".env")
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_KEY")
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("SUPABASE_URL e SUPABASE_KEY não configuradas no .env")
+if not supabase_url or not supabase_key:
+    raise ValueError("SUPABASE_URL e SUPABASE_KEY devem estar configuradas no arquivo .env")
 
-# Cliente global do Supabase para o app inteiro
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Cliente global do Supabase para toda a aplicação
+supabase: Client = create_client(supabase_url, supabase_key)
 
-# Função mantida para compatibilidade com o lifespan do server.py
-async def ensure_indexes():
-    # No Supabase/PostgreSQL os índices são criados via SQL no painel, 
-    # mas mantemos a função vazia aqui para não quebrar o lifespan.
-    pass
+logger = logging.getLogger(__name__)
+
+async def ensure_indexes() -> None:
+    """
+    No Supabase (PostgreSQL), os índices e tabelas são gerenciados 
+    via SQL no painel do Supabase. Mantido vazio para compatibilidade com o lifespan.
+    """
+    logger.info("Supabase client initialized successfully.")
