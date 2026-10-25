@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from lib.db import db
+from lib.db import supabase
 from lib.scheduling import compute_slots, today_local
 from models.schemas import (
     AppointmentIn, Availability, Plan, PublicBookingOut, PublicProfessional, PublicSalon, PublicService,
@@ -15,7 +15,8 @@ router = APIRouter(prefix="/public", tags=["public"])
 
 
 async def _salon(slug: str) -> dict:
-    s = await db.salons.find_one({"slug": slug, "status": {"$ne": "suspenso"}}, {"_id": 0})
+    res = supabase.table("salons").select("*").eq("slug", slug).neq("status", "suspenso").execute()
+    s = res.data[0] if res.data else None
     if not s:
         raise HTTPException(404, "Agenda não encontrada ou indisponível")
     return s
@@ -24,14 +25,20 @@ async def _salon(slug: str) -> dict:
 @router.get("/plans", response_model=list[Plan])
 async def public_plans():
     """Active license plans for the public sales page."""
-    return [Plan(**p) async for p in db.plans.find({"active": True}, {"_id": 0}).sort("price", 1)]
+    res = supabase.table("plans").select("*").eq("active", True).order("price", desc=False).execute()
+    return [Plan(**p) for p in (res.data or [])]
 
 
 @router.get("/salons/{slug}", response_model=PublicSalon)
 async def get_public_salon(slug: str):
     s = await _salon(slug)
-    services = [PublicService(**x) async for x in db.services.find({"salon_id": s["id"], "active": True}, {"_id": 0}).sort("name", 1)]
-    pros = [PublicProfessional(**x) async for x in db.professionals.find({"salon_id": s["id"], "active": True}, {"_id": 0}).sort("name", 1)]
+    
+    res_services = supabase.table("services").select("*").eq("salon_id", s["id"]).eq("active", True).order("name", desc=False).execute()
+    services = [PublicService(**x) for x in (res_services.data or [])]
+    
+    res_pros = supabase.table("professionals").select("*").eq("salon_id", s["id"]).eq("active", True).order("name", desc=False).execute()
+    pros = [PublicProfessional(**x) for x in (res_pros.data or [])]
+    
     return PublicSalon(name=s["name"], slug=s["slug"], phone=s.get("phone", ""), address=s.get("address", ""),
                        open_time=s["open_time"], close_time=s["close_time"], work_days=s["work_days"],
                        today=today_local(), services=services, professionals=pros)
@@ -40,12 +47,16 @@ async def get_public_salon(slug: str):
 @router.get("/salons/{slug}/availability", response_model=Availability)
 async def public_availability(slug: str, date: str, service_id: str, professional_id: Optional[str] = None):
     s = await _salon(slug)
-    svc = await db.services.find_one({"salon_id": s["id"], "id": service_id, "active": True})
+    
+    res_svc = supabase.table("services").select("*").eq("salon_id", s["id"]).eq("id", service_id).eq("active", True).execute()
+    svc = res_svc.data[0] if res_svc.data else None
     if not svc:
         raise HTTPException(404, "Serviço não encontrado")
+        
     pro_ids = await _active_pro_ids(s["id"])
     if professional_id:
         pro_ids = [x for x in pro_ids if x == professional_id]
+        
     is_open, slots = await compute_slots(s, date, svc["duration"], pro_ids)
     return Availability(date=date, open=is_open, slots=list(slots.keys()))
 
