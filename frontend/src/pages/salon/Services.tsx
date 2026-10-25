@@ -7,7 +7,7 @@ import { brl, errMsg } from "@/lib/format";
 import { useReadOnly } from "@/lib/useMe";
 import type { Service, ServiceIn } from "@/lib/types";
 import { EmptyState, PageHeader } from "@/components/common";
-import { useServices } from "@/components/AppointmentDialogs";
+import { useServices } from "@/lib/salonQueries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

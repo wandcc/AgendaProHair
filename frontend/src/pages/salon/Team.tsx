@@ -7,7 +7,7 @@ import { errMsg, formatPhone, maskPhone, waLink } from "@/lib/format";
 import { useReadOnly } from "@/lib/useMe";
 import type { Professional, ProfessionalIn } from "@/lib/types";
 import { EmptyState, PageHeader } from "@/components/common";
-import { usePros } from "@/components/AppointmentDialogs";
+import { usePros } from "@/lib/salonQueries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

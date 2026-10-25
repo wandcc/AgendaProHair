@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useMe } from "@/lib/useMe";
 import type { Salon, SalonSettingsIn } from "@/lib/types";
 import { PageHeader, Panel } from "@/components/common";
-import { useSalon } from "@/components/AppointmentDialogs";
+import { useSalon } from "@/lib/salonQueries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

@@ -6,7 +6,8 @@ import { brl, longDate } from "@/lib/format";
 import { useMe, useReadOnly } from "@/lib/useMe";
 import type { Appointment } from "@/lib/types";
 import { EmptyState, PageHeader, Panel, StatCard, StatusBadge } from "@/components/common";
-import { AppointmentDetailDialog, NewAppointmentDialog, useDashboard } from "@/components/AppointmentDialogs";
+import { AppointmentDetailDialog, NewAppointmentDialog } from "@/components/AppointmentDialogs";
+import { useDashboard } from "@/lib/salonQueries";
 import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function SalonDashboard() {

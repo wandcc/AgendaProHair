@@ -9,6 +9,12 @@ import { buttonVariants } from "@/components/ui/button";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SalonStatusBadge } from "@/pages/admin/AdminSalons";
 
+// Chart props hoisted so Recharts doesn't receive new objects on every render.
+const AXIS_TICK = { fontSize: 12, fill: "#475569" };
+const BAR_RADIUS: [number, number, number, number] = [8, 8, 0, 0];
+const fmtBrlTick = (v: number) => `R$${v}`;
+const fmtBrl = (value: number) => brl(value);
+
 export default function AdminDashboard() {
   const metrics = useQuery({ queryKey: ["admin", "metrics"], queryFn: () => apiGet<AdminMetrics>("/admin/metrics") });
   const salons = useQuery({ queryKey: ["admin", "salons"], queryFn: () => apiGet<SalonAdminRow[]>("/admin/salons") });
@@ -38,10 +44,10 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={m.plans}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                  <XAxis dataKey="plan_name" tick={{ fontSize: 12, fill: "#475569" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: "#475569" }} axisLine={false} tickLine={false} width={60} tickFormatter={(v: number) => `R$${v}`} />
-                  <Tooltip formatter={(value: number) => brl(value)} />
-                  <Bar dataKey="revenue" name="MRR" fill="#4F46E5" radius={[8, 8, 0, 0]} />
+                  <XAxis dataKey="plan_name" tick={AXIS_TICK} axisLine={false} tickLine={false} />
+                  <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={60} tickFormatter={fmtBrlTick} />
+                  <Tooltip formatter={fmtBrl} />
+                  <Bar dataKey="revenue" name="MRR" fill="#4F46E5" radius={BAR_RADIUS} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

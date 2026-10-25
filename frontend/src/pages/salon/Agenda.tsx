@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarPlus, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { apiGet } from "@/lib/api";
@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { useMe, useReadOnly } from "@/lib/useMe";
 import type { Appointment } from "@/lib/types";
 import { EmptyState, PageHeader } from "@/components/common";
-import { AppointmentDetailDialog, NewAppointmentDialog, useDashboard, usePros, useSalon } from "@/components/AppointmentDialogs";
+import { AppointmentDetailDialog, NewAppointmentDialog } from "@/components/AppointmentDialogs";
+import { useDashboard, usePros, useSalon } from "@/lib/salonQueries";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -32,14 +33,19 @@ export default function Agenda() {
   });
   const [newOpen, setNewOpen] = useState(false);
   const [detail, setDetail] = useState<Appointment | null>(null);
-  const list = appts.isError ? [] : appts.data ?? [];
+  const list = useMemo(() => (appts.isError ? [] : appts.data ?? []), [appts.isError, appts.data]);
   const step = view === "dia" ? 1 : 7;
+  const visiblePros = useMemo(
+    () => (pros.data ?? []).filter((p) => p.active || list.some((a) => a.professional_id === p.id)),
+    [pros.data, list],
+  );
+  const noTeam = !pros.isPending && (pros.data ?? []).length === 0;
 
   return (
     <>
       <PageHeader
         title="Agenda"
-        subtitle={day ? (view === "dia" ? longDate(day) : `Semana de ${shortDate(range.start)} a ${shortDate(range.end)}`) : ""}
+        subtitle={agendaSubtitle(view, day, range)}
         actions={!ro && <Button onClick={() => setNewOpen(true)} data-testid="btn-agenda-new-appointment"><CalendarPlus className="size-4" /> Novo agendamento</Button>}
       />
 
@@ -63,11 +69,11 @@ export default function Agenda() {
         ))}
       </div>
 
-      {(pros.data ?? []).length === 0 && !pros.isPending ? (
-        <EmptyState icon={<Users className="size-5" />} title="Cadastre sua equipe" text="Adicione profissionais e serviços para começar a usar a agenda." />
-      ) : view === "dia" ? (
-        <DayGrid appts={list} pros={(pros.data ?? []).filter((p) => p.active || list.some((a) => a.professional_id === p.id))} open={salon.data?.open_time ?? "08:00"} close={salon.data?.close_time ?? "20:00"} onPick={setDetail} />
-      ) : (
+      {noTeam && <EmptyState icon={<Users className="size-5" />} title="Cadastre sua equipe" text="Adicione profissionais e serviços para começar a usar a agenda." />}
+      {!noTeam && view === "dia" && (
+        <DayGrid appts={list} pros={visiblePros} open={salon.data?.open_time ?? "08:00"} close={salon.data?.close_time ?? "20:00"} onPick={setDetail} />
+      )}
+      {!noTeam && view === "semana" && (
         <WeekGrid appts={list} start={range.start} today={today} onPick={setDetail} onDay={(d) => { setCursor(d); setView("dia"); }} />
       )}
 
@@ -77,11 +83,32 @@ export default function Agenda() {
   );
 }
 
+function agendaSubtitle(view: "dia" | "semana", day: string, range: { start: string; end: string }): string {
+  if (!day) return "";
+  if (view === "dia") return longDate(day);
+  return `Semana de ${shortDate(range.start)} a ${shortDate(range.end)}`;
+}
+
+function groupByPro(appts: Appointment[]): Map<string, Appointment[]> {
+  const m = new Map<string, Appointment[]>();
+  for (const a of appts) {
+    const list = m.get(a.professional_id);
+    if (list) list.push(a);
+    else m.set(a.professional_id, [a]);
+  }
+  return m;
+}
+
 function DayGrid({ appts, pros, open, close, onPick }: { appts: Appointment[]; pros: { id: string; name: string }[]; open: string; close: string; onPick: (a: Appointment) => void }) {
   const startH = Math.floor(toMin(open) / 60);
   const endH = Math.ceil(toMin(close) / 60);
   const hours = Array.from({ length: endH - startH }, (_, i) => startH + i);
   const height = (endH - startH) * 60 * PX_PER_MIN;
+  const byPro = useMemo(() => groupByPro(appts), [appts]);
+  const columnStyle = useMemo(
+    () => ({ height, backgroundImage: `repeating-linear-gradient(to bottom, #F1F5F9 0 1px, transparent 1px ${60 * PX_PER_MIN}px)` }),
+    [height],
+  );
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm" data-testid="agenda-calendar-grid">
       <div className="flex min-w-max">
@@ -99,8 +126,8 @@ function DayGrid({ appts, pros, open, close, onPick }: { appts: Appointment[]; p
               <span className="grid size-7 place-items-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">{p.name.slice(0, 1)}</span>
               <span className="truncate text-sm font-semibold text-slate-800">{p.name}</span>
             </div>
-            <div className="relative" style={{ height, backgroundImage: `repeating-linear-gradient(to bottom, #F1F5F9 0 1px, transparent 1px ${60 * PX_PER_MIN}px)` }}>
-              {appts.filter((a) => a.professional_id === p.id).map((a) => {
+            <div className="relative" style={columnStyle}>
+              {(byPro.get(p.id) ?? []).map((a) => {
                 const top = (toMin(a.start) - startH * 60) * PX_PER_MIN;
                 const h = Math.max((toMin(a.end) - toMin(a.start)) * PX_PER_MIN - 3, 26);
                 return (
@@ -122,10 +149,15 @@ function DayGrid({ appts, pros, open, close, onPick }: { appts: Appointment[]; p
 
 function WeekGrid({ appts, start, today, onPick, onDay }: { appts: Appointment[]; start: string; today: string; onPick: (a: Appointment) => void; onDay: (d: string) => void }) {
   const days = start ? Array.from({ length: 7 }, (_, i) => addDays(start, i)) : [];
+  const byDate = useMemo(() => {
+    const m = new Map<string, Appointment[]>();
+    for (const x of appts) m.set(x.date, [...(m.get(x.date) ?? []), x]);
+    return m;
+  }, [appts]);
   return (
     <div className="grid gap-3 md:grid-cols-7" data-testid="agenda-week-grid">
       {days.map((d) => {
-        const items = appts.filter((a) => a.date === d);
+        const items = byDate.get(d) ?? [];
         const dt = parseDate(d);
         return (
           <div key={d} className={cn("flex min-h-40 flex-col rounded-2xl border bg-white shadow-sm", d === today ? "border-indigo-300 ring-2 ring-indigo-100" : "border-slate-200")} data-testid={`agenda-week-day-${d}`}>

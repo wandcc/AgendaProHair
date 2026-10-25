@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDownCircle, ArrowUpCircle, ChevronLeft, ChevronRight, Coins, PiggyBank, Plus, Receipt, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -7,7 +7,7 @@ import { brl, errMsg, monthLabel, shiftMonth, shortDate } from "@/lib/format";
 import { useReadOnly } from "@/lib/useMe";
 import type { Expense, ExpenseIn, FinanceOut } from "@/lib/types";
 import { EmptyState, PageHeader, Panel, StatCard } from "@/components/common";
-import { useDashboard } from "@/components/AppointmentDialogs";
+import { useDashboard } from "@/lib/salonQueries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+// Chart props hoisted so Recharts doesn't receive new objects on every render.
+const AXIS_TICK = { fontSize: 11, fill: "#64748B" };
+const fmtTooltip = (value: number, name: string): [string, string] => [brl(value), name];
+const fmtDayLabel = (label: string) => `Dia ${label}`;
 
 const EXP_CATS = ["Aluguel", "Produtos", "Energia", "Água", "Serviços", "Marketing", "Salários", "Outros"];
 
@@ -28,6 +33,7 @@ export default function Finance() {
   const fin = useQuery({ queryKey: ["salon", "finance", m], queryFn: () => apiGet<FinanceOut>(`/salon/finance?month=${m}`), enabled: !!m });
   const d = fin.isError ? undefined : fin.data;
   const [expOpen, setExpOpen] = useState(false);
+  const chartData = useMemo(() => (d?.daily ?? []).map((x) => ({ ...x, label: x.date.slice(8) })), [d?.daily]);
 
   const pay = useMutation({
     mutationFn: (professional_id: string) => apiPost<{ updated: number }>("/salon/commissions/pay", { professional_id, month: m }),
@@ -68,15 +74,15 @@ export default function Finance() {
       <Panel title="Fluxo de caixa diário" className="mt-6" testId="panel-cashflow">
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={(d?.daily ?? []).map((x) => ({ ...x, label: x.date.slice(8) }))}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#4F46E5" stopOpacity={0.35} /><stop offset="100%" stopColor="#4F46E5" stopOpacity={0} /></linearGradient>
                 <linearGradient id="gExp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#E11D48" stopOpacity={0.25} /><stop offset="100%" stopColor="#E11D48" stopOpacity={0} /></linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} width={50} />
-              <Tooltip formatter={(value: number, name: string) => [brl(value), name]} labelFormatter={(label: string) => `Dia ${label}`} />
+              <XAxis dataKey="label" tick={AXIS_TICK} axisLine={false} tickLine={false} />
+              <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={50} />
+              <Tooltip formatter={fmtTooltip} labelFormatter={fmtDayLabel} />
               <Area type="monotone" dataKey="revenue" name="Entradas" stroke="#4F46E5" strokeWidth={2} fill="url(#gRev)" />
               <Area type="monotone" dataKey="expenses" name="Despesas" stroke="#E11D48" strokeWidth={2} fill="url(#gExp)" />
             </AreaChart>

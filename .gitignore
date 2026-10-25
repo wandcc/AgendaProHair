@@ -86,3 +86,12 @@ android-sdk/
 
 # overlay black-box crash/user-report dumps — session data, never history
 **/.emergent/recordings/
+backend/.env
+.emergent/scripts/browser_check_timings.jsonl
+backend/routers/salon.py
+.env
+.env.*
+*.env
+credentials.json
+*.key
+.credentials

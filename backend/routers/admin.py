@@ -41,9 +41,9 @@ async def metrics():
             b.revenue += plan["price"]
     return AdminMetrics(
         total_salons=len(salons),
-        active=sum(1 for s in salons if s["status"] == "ativo"),
-        suspended=sum(1 for s in salons if s["status"] == "suspenso"),
-        delinquent=sum(1 for s in salons if s["status"] == "inadimplente"),
+        active=sum(1 for x in salons if x["status"] == "ativo"),
+        suspended=sum(1 for x in salons if x["status"] == "suspenso"),
+        delinquent=sum(1 for x in salons if x["status"] == "inadimplente"),
         total_professionals=await db.professionals.count_documents({"salon_id": {"$in": ids}, "active": True}),
         total_users=await db.users.count_documents({"salon_id": {"$in": ids}}),
         mrr=mrr,

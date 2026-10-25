@@ -6,8 +6,9 @@ import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { brl, errMsg, formatPhone, longDate, maskPhone, shortDate, STATUS_META, waLink } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useReadOnly } from "@/lib/useMe";
-import type { Appointment, AppointmentIn, ApptStatus, Availability, DashboardOut, Professional, Salon, Service } from "@/lib/types";
+import type { Appointment, AppointmentIn, ApptStatus, Availability } from "@/lib/types";
 import { StatusBadge } from "@/components/common";
+import { usePros, useServices } from "@/lib/salonQueries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +16,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export const useSalon = () => useQuery({ queryKey: ["salon", "me"], queryFn: () => apiGet<Salon>("/salon/me") });
-export const useServices = () => useQuery({ queryKey: ["salon", "services"], queryFn: () => apiGet<Service[]>("/salon/services") });
-export const usePros = () => useQuery({ queryKey: ["salon", "professionals"], queryFn: () => apiGet<Professional[]>("/salon/professionals") });
-export const useDashboard = () => useQuery({ queryKey: ["salon", "dashboard"], queryFn: () => apiGet<DashboardOut>("/salon/dashboard") });
 
 export function NewAppointmentDialog({ open, onOpenChange, defaultDate }: { open: boolean; onOpenChange: (o: boolean) => void; defaultDate: string }) {
   return (
@@ -60,7 +57,6 @@ function NewAppointmentForm({ defaultDate, onDone }: { defaultDate: string; onDo
     if (!f.start) return toast.error("Escolha um horário disponível");
     create.mutate();
   };
-  const slots = avail.isError ? [] : avail.data?.slots ?? [];
 
   if (!services.isPending && activeServices.length === 0) {
     return <p className="p-2 text-sm text-slate-600" data-testid="new-appt-no-services">Cadastre ao menos um serviço e um profissional antes de agendar.</p>;
@@ -96,32 +92,47 @@ function NewAppointmentForm({ defaultDate, onDone }: { defaultDate: string; onDo
       </div>
       <div>
         <Label className="mb-2 block">Horário</Label>
-        {avail.isFetching ? (
-          <p className="text-sm text-slate-500">Buscando horários…</p>
-        ) : avail.data && !avail.data.open ? (
-          <p className="text-sm text-rose-600">Salão fechado nesta data.</p>
-        ) : slots.length === 0 ? (
-          <p className="text-sm text-slate-500">Nenhum horário livre nesta data.</p>
-        ) : (
-          <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto" data-testid="new-appt-slots">
-            {slots.map((s) => (
-              <button type="button" key={s} onClick={() => setF({ ...f, start: s })} data-testid={`new-appt-slot-${s.replace(":", "")}`}
-                className={cn("rounded-lg border px-3 py-1.5 font-mono text-sm transition-[background-color,border-color,color]", f.start === s ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 hover:border-indigo-300")}>
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
+        <SlotPicker avail={avail.isError ? undefined : avail.data} loading={avail.isFetching} value={f.start} onPick={(s) => setF({ ...f, start: s })} />
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5"><Label>Nome do cliente</Label><Input required value={f.client_name} onChange={(e) => setF({ ...f, client_name: e.target.value })} data-testid="input-new-appt-client-name" /></div>
-        <div className="space-y-1.5"><Label>WhatsApp</Label><Input required inputMode="tel" value={f.client_phone} onChange={(e) => setF({ ...f, client_phone: maskPhone(e.target.value) })} placeholder="(11) 98765-4321" data-testid="input-new-appt-client-phone" /></div>
-      </div>
-      <div className="space-y-1.5"><Label>Observações</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} data-testid="input-new-appt-notes" /></div>
+      <ClientFields
+        value={{ name: f.client_name, phone: f.client_phone, notes: f.notes }}
+        onChange={(c) => setF({ ...f, client_name: c.name, client_phone: c.phone, notes: c.notes })}
+      />
       <DialogFooter>
         <Button type="submit" disabled={create.isPending} data-testid="btn-submit-new-appointment">{create.isPending && <Loader2 className="size-4 animate-spin" />} Confirmar agendamento</Button>
       </DialogFooter>
     </form>
+  );
+}
+
+function SlotPicker({ avail, loading, value, onPick }: { avail: Availability | undefined; loading: boolean; value: string; onPick: (s: string) => void }) {
+  if (loading) return <p className="text-sm text-slate-500">Buscando horários…</p>;
+  if (avail && !avail.open) return <p className="text-sm text-rose-600">Salão fechado nesta data.</p>;
+  const slots = avail?.slots ?? [];
+  if (slots.length === 0) return <p className="text-sm text-slate-500">Nenhum horário livre nesta data.</p>;
+  return (
+    <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto" data-testid="new-appt-slots">
+      {slots.map((s) => (
+        <button type="button" key={s} onClick={() => onPick(s)} data-testid={`new-appt-slot-${s.replace(":", "")}`}
+          className={cn("rounded-lg border px-3 py-1.5 font-mono text-sm transition-[background-color,border-color,color]", value === s ? "border-indigo-500 bg-indigo-600 text-white" : "border-slate-200 hover:border-indigo-300")}>
+          {s}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+interface ClientData { name: string; phone: string; notes: string }
+
+function ClientFields({ value, onChange }: { value: ClientData; onChange: (v: ClientData) => void }) {
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5"><Label>Nome do cliente</Label><Input required value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} data-testid="input-new-appt-client-name" /></div>
+        <div className="space-y-1.5"><Label>WhatsApp</Label><Input required inputMode="tel" value={value.phone} onChange={(e) => onChange({ ...value, phone: maskPhone(e.target.value) })} placeholder="(11) 98765-4321" data-testid="input-new-appt-client-phone" /></div>
+      </div>
+      <div className="space-y-1.5"><Label>Observações</Label><Textarea rows={2} value={value.notes} onChange={(e) => onChange({ ...value, notes: e.target.value })} data-testid="input-new-appt-notes" /></div>
+    </>
   );
 }
 

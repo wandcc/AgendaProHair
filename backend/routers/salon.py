@@ -180,79 +180,109 @@ async def availability(date: str, service_id: str, professional_id: Optional[str
 
 
 # ---------- dashboard ----------
-@router.get("/dashboard", response_model=DashboardOut)
-async def dashboard(p: Principal = Depends(require_salon)):
-    today = today_local()
-    month = today[:7]
-    month_appts = await db.appointments.find(_scope(p, date={"$regex": f"^{month}"}), {"_id": 0}).to_list(10000)
-    today_appts = sorted([a for a in month_appts if a["date"] == today], key=lambda a: a["start"])
-    done = [a for a in month_appts if a["status"] == "finalizado"]
-    pending_comm = await db.appointments.find(_scope(p, status="finalizado", commission_paid=False), {"_id": 0}).to_list(10000)
-    recent = await db.appointments.find(_scope(p, source="online"), {"_id": 0}).sort("created_at", -1).to_list(6)
-    notifications = [
+def _notifications(recent: list[dict], salon_status: Optional[str]) -> list[Notification]:
+    items = [
         Notification(id=a["id"], title="Novo agendamento online",
-                     message=f"{a['client_name']} agendou {a['service_name']} em {a['date'][8:10]}/{a['date'][5:7]} às {a['start']} com {a['professional_name']}",
+                     message=f"{a['client_name']} agendou {a['service_name']} em {a['date'][8:10]}/{a['date'][5:7]} "
+                             f"às {a['start']} com {a['professional_name']}",
                      created_at=a["created_at"])
         for a in recent
     ]
-    if (p.salon or {}).get("status") == "inadimplente":
-        notifications.insert(0, Notification(id="billing", title="Pagamento pendente",
-                                              message="Sua assinatura está com pagamento em atraso. Regularize para evitar suspensão.",
-                                              created_at=recent[0]["created_at"] if recent else datetime.now(timezone.utc)))
+    if salon_status == "inadimplente":
+        items.insert(0, Notification(
+            id="billing", title="Pagamento pendente",
+            message="Sua assinatura está com pagamento em atraso. Regularize para evitar suspensão.",
+            created_at=recent[0]["created_at"] if recent else datetime.now(timezone.utc)))
+    return items
+
+
+def _price_sum(appts: list[dict], *statuses: str) -> float:
+    return sum(a["price"] for a in appts if a["status"] in statuses)
+
+
+def _count(appts: list[dict], *statuses: str) -> int:
+    return sum(1 for a in appts if a["status"] in statuses)
+
+
+@router.get("/dashboard", response_model=DashboardOut)
+async def dashboard(p: Principal = Depends(require_salon)):
+    today = today_local()
+    month_appts = await db.appointments.find(_scope(p, date={"$regex": f"^{today[:7]}"}), {"_id": 0}).to_list(10000)
+    today_appts = sorted((a for a in month_appts if a["date"] == today), key=lambda a: a["start"])
+    pending_comm = await db.appointments.find(_scope(p, status="finalizado", commission_paid=False), {"_id": 0}).to_list(10000)
+    recent = await db.appointments.find(_scope(p, source="online"), {"_id": 0}).sort("created_at", -1).to_list(6)
     return DashboardOut(
         today=today,
-        revenue_today=sum(a["price"] for a in today_appts if a["status"] == "finalizado"),
-        revenue_month=sum(a["price"] for a in done),
-        forecast_month=sum(a["price"] for a in month_appts if a["status"] in ("finalizado", "confirmado")),
-        appointments_today_count=len([a for a in today_appts if a["status"] != "cancelado"]),
-        pending_today=len([a for a in today_appts if a["status"] == "confirmado"]),
+        revenue_today=_price_sum(today_appts, "finalizado"),
+        revenue_month=_price_sum(month_appts, "finalizado"),
+        forecast_month=_price_sum(month_appts, "finalizado", "confirmado"),
+        appointments_today_count=_count(today_appts, "confirmado", "finalizado", "ausente"),
+        pending_today=_count(today_appts, "confirmado"),
         commissions_pending=round(sum(_commission(a) for a in pending_comm), 2),
         appointments_today=[Appointment(**a) for a in today_appts],
-        notifications=notifications,
+        notifications=_notifications(recent, (p.salon or {}).get("status")),
     )
 
 
 # ---------- finance ----------
+def _commission_rows(pros: list[dict], appts: list[dict]) -> list[ProfessionalCommission]:
+    rows = {
+        x["id"]: ProfessionalCommission(professional_id=x["id"], name=x["name"], commission_pct=x["commission_pct"],
+                                        appointments=0, revenue=0, commission=0, paid=0, pending=0)
+        for x in pros
+    }
+    for a in appts:
+        row = rows.get(a["professional_id"])
+        if row:
+            _add_to_commission_row(row, a)
+    return list(rows.values())
+
+
+def _add_to_commission_row(row: ProfessionalCommission, a: dict) -> None:
+    c = _commission(a)
+    row.appointments += 1
+    row.revenue += a["price"]
+    row.commission = round(row.commission + c, 2)
+    if a.get("commission_paid"):
+        row.paid = round(row.paid + c, 2)
+    else:
+        row.pending = round(row.pending + c, 2)
+
+
+def _month_days(month: str) -> list[str]:
+    y, m = map(int, month.split("-"))
+    first = date_cls(y, m, 1)
+    nxt = (first.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return [(first + timedelta(days=i)).isoformat() for i in range((nxt - first).days)]
+
+
+def _daily_series(month: str, appts: list[dict], expenses: list[dict]) -> list[DailyPoint]:
+    rev: dict[str, float] = {}
+    exp: dict[str, float] = {}
+    for a in appts:
+        rev[a["date"]] = rev.get(a["date"], 0) + a["price"]
+    for e in expenses:
+        exp[e["date"]] = exp.get(e["date"], 0) + e["amount"]
+    return [DailyPoint(date=d, revenue=rev.get(d, 0), expenses=exp.get(d, 0)) for d in _month_days(month)]
+
+
 @router.get("/finance", response_model=FinanceOut)
-async def finance(month: Optional[str] = None, p: Principal = Depends(require_salon)):
+async def finance(month: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+                  p: Principal = Depends(require_salon)):
     month = month or today_local()[:7]
     appts = await db.appointments.find(_scope(p, date={"$regex": f"^{month}"}, status="finalizado"),
                                        {"_id": 0}).sort([("date", -1), ("start", -1)]).to_list(10000)
     expenses = await db.expenses.find(_scope(p, date={"$regex": f"^{month}"}), {"_id": 0}).sort("date", -1).to_list(5000)
     pros = await db.professionals.find(_scope(p), {"_id": 0}).to_list(500)
-    by_pro: dict[str, ProfessionalCommission] = {
-        x["id"]: ProfessionalCommission(professional_id=x["id"], name=x["name"], commission_pct=x["commission_pct"],
-                                        appointments=0, revenue=0, commission=0, paid=0, pending=0) for x in pros
-    }
-    for a in appts:
-        row = by_pro.get(a["professional_id"])
-        if not row:
-            continue
-        c = _commission(a)
-        row.appointments += 1
-        row.revenue += a["price"]
-        row.commission = round(row.commission + c, 2)
-        if a.get("commission_paid"):
-            row.paid = round(row.paid + c, 2)
-        else:
-            row.pending = round(row.pending + c, 2)
-    y, m = map(int, month.split("-"))
-    first = date_cls(y, m, 1)
-    last = (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-    daily = []
-    d = first
-    while d <= last:
-        ds = d.isoformat()
-        daily.append(DailyPoint(date=ds, revenue=sum(a["price"] for a in appts if a["date"] == ds),
-                                expenses=sum(e["amount"] for e in expenses if e["date"] == ds)))
-        d += timedelta(days=1)
+    by_pro = _commission_rows(pros, appts)
     revenue = sum(a["price"] for a in appts)
     exp_total = sum(e["amount"] for e in expenses)
-    comm_total = round(sum(r.commission for r in by_pro.values()), 2)
+    comm_total = round(sum(r.commission for r in by_pro), 2)
     return FinanceOut(
         month=month, revenue=revenue, expenses_total=exp_total, commissions_total=comm_total,
-        profit=round(revenue - exp_total - comm_total, 2), by_professional=list(by_pro.values()),
-        expenses=[Expense(**e) for e in expenses], entries=[Appointment(**a) for a in appts], daily=daily,
+        profit=round(revenue - exp_total - comm_total, 2), by_professional=by_pro,
+        expenses=[Expense(**e) for e in expenses], entries=[Appointment(**a) for a in appts],
+        daily=_daily_series(month, appts, expenses),
     )
 
 
