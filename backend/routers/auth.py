@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from lib.auth import Principal, create_session, current_principal, destroy_session, verify_password
 from lib.bootstrap import DEMO_EMAIL, ensure_demo
-from lib.db import db
+from lib.db import supabase
 from models.schemas import LoginIn, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -20,12 +20,23 @@ def to_user_out(p: Principal) -> UserOut:
 
 @router.post("/login", response_model=UserOut)
 async def login(body: LoginIn, response: Response):
-    user = await db.users.find_one({"email": body.email.strip().lower()}, {"_id": 0})
+    email_clean = body.email.strip().lower()
+    
+    # Buscar usuário no Supabase
+    res_user = supabase.table("users").select("*").eq("email", email_clean).execute()
+    user = res_user.data[0] if res_user.data else None
+    
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(401, "E-mail ou senha inválidos")
-    salon = await db.salons.find_one({"id": user["salon_id"]}, {"_id": 0}) if user.get("salon_id") else None
+        
+    salon = None
+    if user.get("salon_id"):
+        res_salon = supabase.table("salons").select("*").eq("id", user["salon_id"]).execute()
+        salon = res_salon.data[0] if res_salon.data else None
+        
     if salon and salon.get("status") == "suspenso":
         raise HTTPException(403, "Assinatura suspensa. Entre em contato com o suporte AgendaPROHair.")
+        
     await create_session(response, user["id"])
     return to_user_out(Principal(user=user, salon=salon))
 
@@ -33,10 +44,18 @@ async def login(body: LoginIn, response: Response):
 @router.post("/demo", response_model=UserOut)
 async def demo_login(response: Response):
     await ensure_demo()
-    user = await db.users.find_one({"email": DEMO_EMAIL}, {"_id": 0})
+    
+    res_user = supabase.table("users").select("*").eq("email", DEMO_EMAIL).execute()
+    user = res_user.data[0] if res_user.data else None
+    
     if not user:
         raise HTTPException(500, "Demonstração indisponível")
-    salon = await db.salons.find_one({"id": user["salon_id"]}, {"_id": 0})
+        
+    salon = None
+    if user.get("salon_id"):
+        res_salon = supabase.table("salons").select("*").eq("id", user["salon_id"]).execute()
+        salon = res_salon.data[0] if res_salon.data else None
+        
     await create_session(response, user["id"])
     return to_user_out(Principal(user=user, salon=salon))
 
