@@ -14,34 +14,34 @@ async def ensure_demo() -> None:
     pass
 
 async def ensure_base_data() -> None:
-    logger.info("A garantir criacao do superusuario no Supabase...")
+    logger.info("A verificar e configurar o superusuario administrador...")
     
     admin_email = "wand_cc@hotmail.com"
     admin_password = "Wand050391@"
     admin_name = "Wanderson Admin"
     
     try:
-        # Gera o hash real e seguro utilizando o bcrypt do projeto
+        # Gera o hash exato utilizando o passlib/bcrypt do Python
         hashed_pwd = hash_password(admin_password)
         
-        # Verifica se o utilizador já existe
+        # Verifica se o utilizador já existe na tabela users
         response = supabase.table("users").select("*").eq("email", admin_email).execute()
         existing = response.data
         
         if existing:
-            # Atualiza a senha correta
             user_id = existing[0]["id"]
-            supabase.table("users").update({"password_hash": hashed_pwd}).eq("id", user_id).execute()
-            logger.info("Senha do superusuario atualizada com sucesso via boot!")
+            # Atualiza a senha e garante privilégios se necessário
+            supabase.table("users").update({"password_hash": hashed_pwd, "name": admin_name}).eq("id", user_id).execute()
+            logger.info(f"✅ Senha do superusuario '{admin_email}' atualizada com sucesso via backend!")
         else:
-            # Insere o novo superusuario com ID gerado automaticamente ou tratado pela DB
+            # Se não existir, insere o novo registo
             new_user = {
                 "email": admin_email,
                 "name": admin_name,
                 "password_hash": hashed_pwd
             }
             supabase.table("users").insert(new_user).execute()
-            logger.info("Superusuario criado com sucesso via boot!")
+            logger.info(f"✅ Superusuario '{admin_email}' criado com sucesso via backend!")
             
     except Exception as e:
-        logger.error(f"Erro ao configurar superusuario: {e}")
+        logger.error(f"❌ Erro crítico ao configurar superusuario no boot: {e}")
