@@ -10,7 +10,7 @@ import random
 from datetime import date as date_cls, timedelta
 
 from lib.auth import hash_password
-from lib.db import db
+from lib.db import supabase
 from lib.scheduling import now_local, today_local, to_hhmm, to_min, weekday_sun0
 from models.schemas import Appointment, Expense, Plan, Professional, Salon, Service
 
@@ -23,25 +23,35 @@ async def ensure_base_data() -> None:
     # Super admin comes from env (email + pbkdf2 hash) — no plaintext password in code or config.
     admin_email = os.environ.get("SUPERADMIN_EMAIL", "").strip().lower()
     admin_hash = os.environ.get("SUPERADMIN_PASSWORD_HASH", "")
+    
     if admin_email and admin_hash:
-        if not await db.users.find_one({"email": admin_email}):
-            await db.users.insert_one({
+        # Verificar se o superadmin já existe
+        res_admin = supabase.table("users").select("*").eq("email", admin_email).execute()
+        if not res_admin.data:
+            supabase.table("users").insert({
                 "id": f"superadmin-{admin_email}", "email": admin_email, "name": "Super Admin",
                 "password_hash": admin_hash, "platform_role": "superadmin",
                 "salon_id": None, "salon_role": None,
-            })
-        # retire the old default account (weak, publicly known password)
-        old = await db.users.find_one({"email": LEGACY_DEFAULT_ADMIN})
-        if old:
-            await db.users.delete_one({"email": LEGACY_DEFAULT_ADMIN})
-            await db.sessions.delete_many({"user_id": old["id"]})
-    if await db.plans.count_documents({}) == 0:
-        await db.plans.insert_many([
+            }).execute()
+            
+        # Retirar a conta padrão antiga (fraca, senha publicamente conhecida)
+        res_old = supabase.table("users").select("*").eq("email", LEGACY_DEFAULT_ADMIN).execute()
+        if res_old.data:
+            old = res_old.data[0]
+            supabase.table("users").delete().eq("email", LEGACY_DEFAULT_ADMIN).execute()
+            supabase.table("sessions").delete().eq("user_id", old["id"]).execute()
+
+    # Verificar planos padrão
+    res_plans = supabase.table("plans").select("id", count="exact").execute()
+    if not res_plans.data or len(res_plans.data) == 0:
+        plans_data = [
             Plan(id="plan-basico", name="Básico", price=49, max_professionals=2,
                  features=["Agenda online", "Link de agendamento + QR", "Até 2 profissionais"]).model_dump(),
             Plan(id="plan-pro", name="Pro", price=89, max_professionals=10,
                  features=["Tudo do Básico", "Financeiro e comissões", "Até 10 profissionais", "WhatsApp"]).model_dump(),
-        ])
+        ]
+        supabase.table("plans").insert(plans_data).execute()
+        
     await ensure_demo()
 
 
@@ -54,43 +64,54 @@ DEMO_OPEN, DEMO_CLOSE = to_min("09:00"), to_min("19:00")
 async def ensure_demo(force: bool = False) -> None:
     """Re-generate the demo salon's data relative to today (at most once per day unless forced)."""
     today = today_local()
-    salon = await db.salons.find_one({"slug": DEMO_SLUG})
+    
+    res_salon = supabase.table("salons").select("*").eq("slug", DEMO_SLUG).execute()
+    salon = res_salon.data[0] if res_salon.data else None
+    
     if salon and salon.get("demo_seeded_on") == today and not force:
         return
+        
     salon = salon or await _create_demo_salon()
     sid = salon["id"]
     await _ensure_demo_user(sid)
     await _clear_salon_data(sid)
+    
     services, pros = _demo_catalog(sid)
-    await db.services.insert_many([x.model_dump() for x in services])
-    await db.professionals.insert_many([x.model_dump() for x in pros])
+    supabase.table("services").insert([x.model_dump() for x in services]).execute()
+    supabase.table("professionals").insert([x.model_dump() for x in pros]).execute()
+    
     appts = _demo_appointments(sid, salon.get("work_days", [1, 2, 3, 4, 5, 6]), services, pros, today)
     if appts:
-        await db.appointments.insert_many(appts)
-    await db.expenses.insert_many([e.model_dump() for e in _demo_expenses(sid, today)])
-    await db.salons.update_one({"id": sid}, {"$set": {"demo_seeded_on": today}})
+        supabase.table("appointments").insert(appts).execute()
+        
+    expenses = [e.model_dump() for e in _demo_expenses(sid, today)]
+    if expenses:
+        supabase.table("expenses").insert(expenses).execute()
+        
+    supabase.table("salons").update({"demo_seeded_on": today}).eq("id", sid).execute()
 
 
 async def _create_demo_salon() -> dict:
     s = Salon(id="demo-salon", name="Salão Exemplo", slug=DEMO_SLUG, phone="11987654321",
               address="Rua das Flores, 120 - São Paulo/SP", plan_id="plan-pro", is_demo=True).model_dump()
-    await db.salons.insert_one(dict(s))
+    supabase.table("salons").insert(dict(s)).execute()
     return s
 
 
 async def _ensure_demo_user(sid: str) -> None:
-    if await db.users.find_one({"email": DEMO_EMAIL}):
+    res_user = supabase.table("users").select("*").eq("email", DEMO_EMAIL).execute()
+    if res_user.data:
         return
-    await db.users.insert_one({
+    supabase.table("users").insert({
         "id": "demo-user", "email": DEMO_EMAIL, "name": "Demonstração",
         "password_hash": hash_password("demo123"), "platform_role": None,
         "salon_id": sid, "salon_role": "owner",
-    })
+    }).execute()
 
 
 async def _clear_salon_data(sid: str) -> None:
     for coll in ("services", "professionals", "appointments", "expenses"):
-        await db[coll].delete_many({"salon_id": sid})
+        supabase.table(coll).delete().eq("salon_id", sid).execute()
 
 
 def _demo_catalog(sid: str) -> tuple[list[Service], list[Professional]]:
