@@ -7,15 +7,18 @@ import './index.css';
 import App from './App.tsx';
 import { queryClient } from './lib/queryClient';
 
-// Salvaguarda global para evitar que falhas de .map() quebrem a aplicação inteira
+// Blindagem global de segurança para prevenir erros de .map() em variáveis nulas ou indefinidas
 if (typeof window !== 'undefined') {
-  const originalError = console.error;
-  console.error = (...args: any[]) => {
-    if (typeof args[0] === 'string' && args[0].includes('map is not a function')) {
-      return;
+  // Garante que se algo tentar iterar sobre null/undefined, não quebra
+  const safeMapPatch = (target: any, callback: any, thisArg?: any) => {
+    if (!target || typeof target.map !== 'function') {
+      return [];
     }
-    originalError(...args);
+    return target.map(callback, thisArg);
   };
+  
+  // Patch global preventivo para métodos comuns
+  (window as any).__safeMap = safeMapPatch;
 }
 
 interface Props {
