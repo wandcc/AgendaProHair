@@ -1,12 +1,12 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import '../index.css';
-import App from '../App.tsx';
-import { queryClient } from '../lib/queryClient';
+import './index.css';
+import App from './App.tsx';
+import { queryClient } from './lib/queryClient';
 
-// Componente de Salvaguarda Global (Error Boundary) para evitar ecrãs em branco
 interface Props {
   children: ReactNode;
 }
@@ -27,7 +27,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Erro capturado pelo ErrorBoundary:", error, errorInfo);
+    console.error("Erro capturado:", error, errorInfo);
   }
 
   public render() {
