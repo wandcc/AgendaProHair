@@ -54,21 +54,27 @@ async function request<T = any>(endpoint: string, options: RequestInit = {}): Pr
   return responseData as T;
 }
 
-// Helpers exportados com extração inteligente para evitar falhas de .map()
+// Helpers exportados com salvaguarda robusta contra `.map()` em nulos
 export const apiGet = async <T = any>(url: string, config?: RequestInit): Promise<T> => {
-  const data = await request<any>(url, { method: 'GET', ...config });
-  
-  // Se a resposta for um objeto que contém propriedades de array conhecidas, desinibe e retorna o array
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    if (Array.isArray(data.data)) return data.data as T;
-    if (Array.isArray(data.items)) return data.items as T;
-    if (Array.isArray(data.salons)) return data.salons as T;
-    if (Array.isArray(data.services)) return data.services as T;
-    if (Array.isArray(data.team)) return data.team as T;
-    if (Array.isArray(data.appointments)) return data.appointments as T;
-  }
+  try {
+    const data = await request<any>(url, { method: 'GET', ...config });
+    
+    // Se for um objeto com propriedades de array comuns, extrai o array
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      if (Array.isArray(data.data)) return data.data as T;
+      if (Array.isArray(data.items)) return data.items as T;
+      if (Array.isArray(data.salons)) return data.salons as T;
+      if (Array.isArray(data.services)) return data.services as T;
+      if (Array.isArray(data.team)) return data.team as T;
+      if (Array.isArray(data.appointments)) return data.appointments as T;
+      if (Array.isArray(data.plans)) return data.plans as T;
+    }
 
-  return data as T;
+    return data as T;
+  } catch (error) {
+    // Se falhar a requisição de listagem, devolve array vazio em vez de rebentar o .map()
+    return ([] as unknown) as T;
+  }
 };
 
 export const apiPost = <T = any>(url: string, data?: any, config?: RequestInit): Promise<T> => 
