@@ -24,4 +24,25 @@ api.interceptors.request.use(
   }
 );
 
+// Helpers exportados para compatibilidade com o projeto (Finance, Services, Team, etc.)
+export const apiGet = async <T = any>(url: string, config?: any): Promise<T> => {
+  const response = await api.get<T>(url, config);
+  return response.data;
+};
+
+export const apiPost = async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
+  const response = await api.post<T>(url, data, config);
+  return response.data;
+};
+
+export const apiPut = async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
+  const response = await api.put<T>(url, data, config);
+  return response.data;
+};
+
+export const apiDelete = async <T = any>(url: string, config?: any): Promise<T> => {
+  const response = await api.delete<T>(url, config);
+  return response.data;
+};
+
 export default api;
