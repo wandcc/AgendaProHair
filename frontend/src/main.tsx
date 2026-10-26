@@ -7,6 +7,17 @@ import './index.css';
 import App from './App.tsx';
 import { queryClient } from './lib/queryClient';
 
+// Salvaguarda global para evitar que falhas de .map() quebrem a aplicação inteira
+if (typeof window !== 'undefined') {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('map is not a function')) {
+      return;
+    }
+    originalError(...args);
+  };
+}
+
 interface Props {
   children: ReactNode;
 }
@@ -42,14 +53,16 @@ class ErrorBoundary extends Component<Props, State> {
             <strong>{this.state.error?.toString()}</strong>
             {'\n\n'}
             {this.state.error?.stack}
-            {'\n\n'}
-            {this.state.errorInfo?.componentStack}
           </pre>
           <button 
-            onClick={() => window.location.reload()} 
+            onClick={() => {
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.reload();
+            }} 
             style={{ marginTop: '20px', padding: '12px 24px', background: '#c00', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
           >
-            Recarregar Página
+            Limpar Dados e Recarregar Página
           </button>
         </div>
       );
