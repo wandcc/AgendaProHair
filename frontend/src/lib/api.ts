@@ -54,10 +54,21 @@ async function request<T = any>(endpoint: string, options: RequestInit = {}): Pr
   return responseData as T;
 }
 
-// Helpers exportados com salvaguarda para evitar falhas de .map() se a resposta não for array
+// Helpers exportados com extração inteligente para evitar falhas de .map()
 export const apiGet = async <T = any>(url: string, config?: RequestInit): Promise<T> => {
-  const data = await request<T>(url, { method: 'GET', ...config });
-  return data;
+  const data = await request<any>(url, { method: 'GET', ...config });
+  
+  // Se a resposta for um objeto que contém propriedades de array conhecidas, desinibe e retorna o array
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    if (Array.isArray(data.data)) return data.data as T;
+    if (Array.isArray(data.items)) return data.items as T;
+    if (Array.isArray(data.salons)) return data.salons as T;
+    if (Array.isArray(data.services)) return data.services as T;
+    if (Array.isArray(data.team)) return data.team as T;
+    if (Array.isArray(data.appointments)) return data.appointments as T;
+  }
+
+  return data as T;
 };
 
 export const apiPost = <T = any>(url: string, data?: any, config?: RequestInit): Promise<T> => 
