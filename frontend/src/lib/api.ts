@@ -1,48 +1,80 @@
-import axios from 'axios';
-
 // Lê a URL do backend configurada na Vercel (ou usa o Render como fallback)
 const API_URL = import.meta.env.VITE_API_URL || 'https://agenda-pro-hair-api.onrender.com';
 
-export const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+// Classe de Erro personalizada exportada para format.ts e PublicBooking.tsx
+export class ApiError extends Error {
+  status: number;
+  data: any;
 
-// Interceptor para injetar o token de autenticação em todas as requisições
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+  constructor(message: string, status: number, data?: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
   }
-);
+}
 
-// Helpers exportados para compatibilidade com o projeto (Finance, Services, Team, etc.)
-export const apiGet = async <T = any>(url: string, config?: any): Promise<T> => {
-  const response = await api.get<T>(url, config);
-  return response.data;
-};
+// Helper genérico para requisições com fetch
+async function request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  };
 
-export const apiPost = async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
-  const response = await api.post<T>(url, data, config);
-  return response.data;
-};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
-export const apiPut = async <T = any>(url: string, data?: any, config?: any): Promise<T> => {
-  const response = await api.put<T>(url, data, config);
-  return response.data;
-};
+  const url = endpoint.startsWith('http') ? endpoint : `${API_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
-export const apiDelete = async <T = any>(url: string, config?: any): Promise<T> => {
-  const response = await api.delete<T>(url, config);
-  return response.data;
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  let responseData: any;
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    responseData = await response.json();
+  } else {
+    responseData = await response.text();
+  }
+
+  if (!response.ok) {
+    const errorMessage = typeof responseData === 'object' && responseData?.detail 
+      ? responseData.detail 
+      : `Erro na requisição (${response.status})`;
+    throw new ApiError(errorMessage, response.status, responseData);
+  }
+
+  return responseData as T;
+}
+
+// Helpers exportados para todas as páginas do projeto
+export const apiGet = <T = any>(url: string, config?: RequestInit): Promise<T> => 
+  request<T>(url, { method: 'GET', ...config });
+
+export const apiPost = <T = any>(url: string, data?: any, config?: RequestInit): Promise<T> => 
+  request<T>(url, { method: 'POST', body: data ? JSON.stringify(data) : undefined, ...config });
+
+export const apiPut = <T = any>(url: string, data?: any, config?: RequestInit): Promise<T> => 
+  request<T>(url, { method: 'PUT', body: data ? JSON.stringify(data) : undefined, ...config });
+
+export const apiPatch = <T = any>(url: string, data?: any, config?: RequestInit): Promise<T> => 
+  request<T>(url, { method: 'PATCH', body: data ? JSON.stringify(data) : undefined, ...config });
+
+export const apiDelete = <T = any>(url: string, config?: RequestInit): Promise<T> => 
+  request<T>(url, { method: 'DELETE', ...config });
+
+// Objeto de compatibilidade api.get, api.post, etc.
+export const api = {
+  get: apiGet,
+  post: apiPost,
+  put: apiPut,
+  patch: apiPatch,
+  delete: apiDelete,
 };
 
 export default api;
