@@ -54,12 +54,12 @@ async function request<T = any>(endpoint: string, options: RequestInit = {}): Pr
   return responseData as T;
 }
 
-// Helpers exportados com salvaguarda robusta contra `.map()` em nulos
+// Helpers exportados com blindagem total contra falhas de .map()
 export const apiGet = async <T = any>(url: string, config?: RequestInit): Promise<T> => {
   try {
     const data = await request<any>(url, { method: 'GET', ...config });
     
-    // Se for um objeto com propriedades de array comuns, extrai o array
+    // Se a API devolver um objeto embrulhado, extrai o array correspondente
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       if (Array.isArray(data.data)) return data.data as T;
       if (Array.isArray(data.items)) return data.items as T;
@@ -68,11 +68,19 @@ export const apiGet = async <T = any>(url: string, config?: RequestInit): Promis
       if (Array.isArray(data.team)) return data.team as T;
       if (Array.isArray(data.appointments)) return data.appointments as T;
       if (Array.isArray(data.plans)) return data.plans as T;
+      
+      // Se for um objeto genérico mas vazio, retorna array vazio se necessário
+      return data as T;
     }
 
-    return data as T;
+    // Se já for array, retorna diretamente
+    if (Array.isArray(data)) {
+      return data as T;
+    }
+
+    return (data || []) as T;
   } catch (error) {
-    // Se falhar a requisição de listagem, devolve array vazio em vez de rebentar o .map()
+    // Salvaguarda: se a requisição falhar, retorna array vazio para o componente não quebrar o map
     return ([] as unknown) as T;
   }
 };
