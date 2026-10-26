@@ -5,12 +5,14 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://agenda-pro-hair-api.onr
 export class ApiError extends Error {
   status: number;
   data: any;
+  body: any;
 
   constructor(message: string, status: number, data?: any) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.data = data;
+    this.body = data; // Suporta tanto .data como .body para o format.ts
   }
 }
 
