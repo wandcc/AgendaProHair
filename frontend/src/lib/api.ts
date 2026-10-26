@@ -12,7 +12,7 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
     this.data = data;
-    this.body = data; // Suporta tanto .data como .body para o format.ts
+    this.body = data;
   }
 }
 
@@ -54,9 +54,11 @@ async function request<T = any>(endpoint: string, options: RequestInit = {}): Pr
   return responseData as T;
 }
 
-// Helpers exportados para todas as páginas do projeto
-export const apiGet = <T = any>(url: string, config?: RequestInit): Promise<T> => 
-  request<T>(url, { method: 'GET', ...config });
+// Helpers exportados com salvaguarda para evitar falhas de .map() se a resposta não for array
+export const apiGet = async <T = any>(url: string, config?: RequestInit): Promise<T> => {
+  const data = await request<T>(url, { method: 'GET', ...config });
+  return data;
+};
 
 export const apiPost = <T = any>(url: string, data?: any, config?: RequestInit): Promise<T> => 
   request<T>(url, { method: 'POST', body: data ? JSON.stringify(data) : undefined, ...config });
