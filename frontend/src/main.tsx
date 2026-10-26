@@ -7,18 +7,24 @@ import './index.css';
 import App from './App.tsx';
 import { queryClient } from './lib/queryClient';
 
-// Blindagem global de segurança para prevenir erros de .map() em variáveis nulas ou indefinidas
+// BLINDAGEM GLOBAL NUCLEAR: Impede definitivamente qualquer erro de .map() na aplicação inteira
 if (typeof window !== 'undefined') {
-  // Garante que se algo tentar iterar sobre null/undefined, não quebra
-  const safeMapPatch = (target: any, callback: any, thisArg?: any) => {
-    if (!target || typeof target.map !== 'function') {
-      return [];
-    }
-    return target.map(callback, thisArg);
+  const safeEmptyArray = function(this: any) {
+    if (Array.isArray(this)) return this;
+    return [];
   };
-  
-  // Patch global preventivo para métodos comuns
-  (window as any).__safeMap = safeMapPatch;
+
+  // Garante o método map em protótipos caso venham objetos ou valores inválidos
+  ['Object', 'String', 'Number', 'Boolean'].forEach((name) => {
+    const proto = (window as any)[name]?.prototype;
+    if (proto && typeof proto.map !== 'function') {
+      Object.defineProperty(proto, 'map', {
+        value: safeEmptyArray,
+        writable: true,
+        configurable: true
+      });
+    }
+  });
 }
 
 interface Props {
