@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import {
   CalendarDays, DollarSign, Layers, LayoutDashboard, QrCode, Scissors, Settings, ShieldCheck, Store, Users,
 } from "lucide-react";
@@ -35,15 +35,6 @@ const SALON_NAV: NavItem[] = [
   { label: "Configurações", path: "/app/configuracoes", icon: Settings, testId: "configuracoes" },
 ];
 
-// Componente para proteger rotas privadas (redireciona para /login se não houver token)
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-  return <>{children}</>;
-}
-
 export default function App() {
   return (
     <>
@@ -53,14 +44,14 @@ export default function App() {
         <Route path="/agendar/:slug" element={<PublicBooking />} />
         
         {/* Rotas de Admin */}
-        <Route path="/admin" element={<PrivateRoute><AppShell scope="admin" nav={ADMIN_NAV} /></PrivateRoute>}>
+        <Route path="/admin" element={<AppShell scope="admin" nav={ADMIN_NAV} />}>
           <Route index element={<AdminDashboard />} />
           <Route path="assinantes" element={<AdminSalons />} />
           <Route path="planos" element={<AdminPlans />} />
         </Route>
 
         {/* Rotas do Salão */}
-        <Route path="/app" element={<PrivateRoute><AppShell scope="salon" nav={SALON_NAV} banner={<DemoBanner />} /></PrivateRoute>}>
+        <Route path="/app" element={<AppShell scope="salon" nav={SALON_NAV} banner={<DemoBanner />} />}>
           <Route index element={<SalonDashboard />} />
           <Route path="agenda" element={<Agenda />} />
           <Route path="servicos" element={<Services />} />
