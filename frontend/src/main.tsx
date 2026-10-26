@@ -14,33 +14,40 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  errorInfo: ErrorInfo | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
+    error: null,
+    errorInfo: null
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    this.setState({ errorInfo });
     console.error("Erro capturado:", error, errorInfo);
   }
 
   public render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '40px', fontFamily: 'sans-serif', background: '#fff0f0', color: '#c00', minHeight: '100vh' }}>
-          <h2>Ocorreu um erro ao carregar a aplicação.</h2>
-          <pre style={{ background: '#fff', padding: '15px', border: '1px solid #ccc', overflowX: 'auto', color: '#333' }}>
-            {this.state.error?.toString()}
+        <div style={{ padding: '40px', fontFamily: 'sans-serif', background: '#fff0f0', color: '#c00', minHeight: '100vh', maxWidth: '1000px', margin: '0 auto' }}>
+          <h2>Ocorreu um erro ao carregar a aplicação:</h2>
+          <pre style={{ background: '#fff', padding: '15px', border: '1px solid #ccc', overflowX: 'auto', color: '#333', fontSize: '14px', lineHeight: '1.5' }}>
+            <strong>{this.state.error?.toString()}</strong>
+            {'\n\n'}
+            {this.state.error?.stack}
+            {'\n\n'}
+            {this.state.errorInfo?.componentStack}
           </pre>
           <button 
             onClick={() => window.location.reload()} 
-            style={{ marginTop: '20px', padding: '10px 20px', background: '#c00', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            style={{ marginTop: '20px', padding: '12px 24px', background: '#c00', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
           >
             Recarregar Página
           </button>
